@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lüftersteuerung Rack</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #121821;
+    --panel-2: #161d28;
+    --border: #232c3a;
+    --text: #e7edf5;
+    --muted: #7c8ba1;
+    --accent: #33e6b0;
+    --accent-glow: rgba(51, 230, 176, 0.45);
+    --danger: #ff5470;
+    --danger-glow: rgba(255, 84, 112, 0.4);
+    --warn: #ffb454;
+    --warn-glow: rgba(255, 180, 84, 0.4);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 15% 0%, #142031 0%, transparent 45%),
+      radial-gradient(circle at 85% 100%, #1a1230 0%, transparent 45%),
+      var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    padding: 32px 16px 80px;
+  }
+
+  .wrap { max-width: 960px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .title-block h1 { margin: 0; font-size: 26px; letter-spacing: 0.5px; }
+  .title-block p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--muted);
+    background: var(--panel); border: 1px solid var(--border);
+    padding: 8px 14px; border-radius: 999px;
+  }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: background .3s, box-shadow .3s; }
+  .status-dot.ok { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+  .status-dot.err { background: var(--danger); box-shadow: 0 0 8px var(--danger-glow); }
+
+  /* ---- Automatik-Status-Badge (in der Zeitplan-Kopfzeile, kein Seitenversatz) ---- */
+  .schedule-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .schedule-header h2 { margin: 0; }
+
+  .automation-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--muted);
+    transition: background .2s, border-color .2s, color .2s;
+  }
+  .automation-status-badge .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--muted); flex-shrink: 0; transition: background .2s, box-shadow .2s;
+  }
+  .automation-status-badge.active {
+    color: var(--accent); border-color: rgba(51,230,176,0.35); background: rgba(51,230,176,0.08);
+  }
+  .automation-status-badge.active .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
+  .automation-status-badge.paused {
+    color: #ffd9a0; border-color: rgba(255,180,84,0.4); background: rgba(255,180,84,0.08);
+    cursor: pointer;
+  }
+  .automation-status-badge.paused:hover { background: rgba(255,180,84,0.16); }
+  .automation-status-badge.paused .dot { background: var(--warn); box-shadow: 0 0 8px var(--warn-glow); }
+  .automation-status-badge.pending {
+    color: #8fb8ff; border-color: rgba(143,184,255,0.35); background: rgba(143,184,255,0.08);
+    cursor: default;
+  }
+  .automation-status-badge.pending .dot { background: #8fb8ff; box-shadow: 0 0 8px rgba(143,184,255,0.5); }
+
+  /* ---- Master card ---- */
+  .master-card {
+    background: linear-gradient(135deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 22px 26px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 22px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .master-card .label { display: flex; align-items: center; gap: 14px; }
+  .master-card .label .fan-icon { width: 34px; height: 34px; color: var(--accent); }
+  .master-card h2 { margin: 0; font-size: 18px; }
+  .master-card span.sub { color: var(--muted); font-size: 13px; }
+
+  /* ---- Grid of fans ---- */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+
+  .fan-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    position: relative; overflow: hidden;
+    transition: border-color .3s, transform .15s;
+  }
+  .fan-card.on { border-color: rgba(51,230,176,0.5); }
+  .fan-card:hover { transform: translateY(-2px); }
+
+  .fan-card .glow {
+    position: absolute; inset: -40% -40% auto auto;
+    width: 140px; height: 140px;
+    background: radial-gradient(circle, var(--accent-glow), transparent 70%);
+    opacity: 0; transition: opacity .4s; pointer-events: none;
+  }
+  .fan-card.on .glow { opacity: 1; }
+
+  .fan-icon-wrap {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--panel-2);
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border);
+  }
+  .fan-icon-wrap svg { width: 36px; height: 36px; color: var(--muted); transition: color .3s; transform-origin: 50% 50%; }
+  .fan-card.on .fan-icon-wrap svg { color: var(--accent); animation: spin 0.9s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+
+  .fan-name { font-weight: 600; font-size: 15px; }
+  .fan-pin { color: var(--muted); font-size: 12px; letter-spacing: 0.5px; }
+
+  /* ---- Toggle switch ---- */
+  .switch { --w: 58px; --h: 30px; width: var(--w); height: var(--h); position: relative; cursor: pointer; }
+  .switch input { display: none; }
+  .switch .track { position: absolute; inset: 0; background: #263042; border-radius: 999px; border: 1px solid var(--border); transition: background .25s, box-shadow .25s; }
+  .switch .thumb { position: absolute; top: 3px; left: 3px; width: calc(var(--h) - 8px); height: calc(var(--h) - 8px); background: #cfd8e3; border-radius: 50%; transition: transform .25s cubic-bezier(.4,0,.2,1), background .25s; }
+  .switch input:checked + .track { background: linear-gradient(135deg, #1fae86, var(--accent)); box-shadow: 0 0 14px var(--accent-glow); }
+  .switch input:checked + .track .thumb { transform: translateX(28px); background: #fff; }
+  .switch input:disabled + .track { opacity: 0.5; cursor: not-allowed; }
+
+  .switch.warn input:checked + .track { background: linear-gradient(135deg, #b8791f, var(--warn)); box-shadow: 0 0 14px var(--warn-glow); }
+
+  .fan-state-label { font-size: 12px; color: var(--muted); min-height: 16px; }
+
+  /* ---- Schedule card ---- */
+  .schedule-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 24px; }
+  .schedule-card h2 { margin: 0 0 4px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  .schedule-card p.hint { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
+
+  .automation-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+  }
+  .automation-row .label { display: flex; flex-direction: column; gap: 2px; }
+  .automation-row .label strong { font-size: 14px; }
+  .automation-row .label span { font-size: 12px; color: var(--muted); }
+
+  /* ---- Timer-Karte ---- */
+  .timer-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 24px; margin-bottom: 22px; }
+  .timer-card h2 { margin: 0 0 4px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  .timer-card p.hint { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+
+  #timer-rows {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .timer-label { font-size: 13px; color: var(--text); font-weight: 600; }
+
+  .timer-btn {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted);
+    padding: 9px 16px; border-radius: 8px; font-size: 13px; cursor: pointer;
+    font-variant-numeric: tabular-nums; text-align: center; min-width: 60px;
+    transition: border-color .15s, background .15s, color .15s;
+  }
+  .timer-btn:hover { border-color: var(--accent); color: var(--text); }
+  .timer-btn.running {
+    background: linear-gradient(135deg, #1fae86, var(--accent)); color: #04140f;
+    border-color: transparent; font-weight: 700;
+  }
+
+
+  .schedule-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; margin-bottom: 18px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .field select { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 10px; font-size: 14px; min-width: 120px; outline: none; }
+  .field select:focus { border-color: var(--accent); }
+
+  .preview { background: var(--panel-2); border: 1px dashed var(--border); border-radius: 12px; padding: 14px 16px; font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+  .preview strong { color: var(--text); }
+
+  .btn { background: linear-gradient(135deg, #1fae86, var(--accent)); color: #04140f; border: none; font-weight: 700; font-size: 14px; padding: 12px 22px; border-radius: 10px; cursor: pointer; box-shadow: 0 6px 20px var(--accent-glow); transition: transform .15s, box-shadow .15s; }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
+
+  .save-msg { font-size: 13px; margin-left: 14px; color: var(--muted); }
+  .save-msg.ok { color: var(--accent); }
+  .save-msg.err { color: var(--danger); }
+
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 36px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="title-block">
+      <h1>🌀 Lüftersteuerung Rack</h1>
+      <p>Raspberry Pi · GPIO-Chip 0 · Live-Steuerung</p>
+    </div>
+    <div class="status-pill">
+      <span class="status-dot" id="conn-dot"></span>
+      <span id="conn-text">verbinde…</span>
+    </div>
+  </header>
+
+  <div class="master-card">
+    <div class="label">
+      <svg class="fan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <circle cx="12" cy="12" r="2"/>
+        <path d="M12 12c0-3 2-6 5-6 2 0 3 1.5 3 3.2 0 2.8-3 3.8-5 2.8"/>
+        <path d="M12 12c3 0 6 2 6 5 0 2-1.5 3-3.2 3-2.8 0-3.8-3-2.8-5"/>
+        <path d="M12 12c0 3-2 6-5 6-2 0-3-1.5-3-3.2 0-2.8 3-3.8 5-2.8"/>
+        <path d="M12 12c-3 0-6-2-6-5 0-2 1.5-3 3.2-3 2.8 0 3.8 3 2.8 5"/>
+      </svg>
+      <div>
+        <h2>Alle Lüfter</h2>
+        <span class="sub">Master-Schalter für GPIO 17 / 27 / 22 / 23</span>
+      </div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="master-toggle">
+      <div class="track"><div class="thumb"></div></div>
+    </label>
+  </div>
+
+  <div class="grid" id="fan-grid"></div>
+
+  <div class="timer-card">
+    <h2>⏲️ Timer</h2>
+    <p class="hint">Klick = sofort an, nochmal klicken = abbrechen.</p>
+    <div id="timer-rows"></div>
+  </div>
+
+  <div class="schedule-card">
+    <div class="schedule-header">
+      <h2>⏱️ Automatischer Zeitplan</h2>
+      <span class="automation-status-badge" id="automation-status-badge">
+        <span class="dot"></span>
+        <span id="automation-status-text">lädt…</span>
+      </span>
+    </div>
+    <p class="hint">Stündlich wiederkehrend – entspricht deinem Cronjob (<code>sudo crontab -e</code>).</p>
+
+    <div class="automation-row">
+      <div class="label">
+        <strong>Automatik</strong>
+        <span id="automation-sub">Zeitplan schaltet die Lüfter stündlich automatisch</span>
+      </div>
+      <label class="switch" id="automation-switch-wrap">
+        <input type="checkbox" id="automation-toggle">
+        <div class="track"><div class="thumb"></div></div>
+      </label>
+    </div>
+
+    <div class="schedule-row">
+      <div class="field">
+        <label for="on-minute">Einschalten bei Minute</label>
+        <select id="on-minute"></select>
+      </div>
+      <div class="field">
+        <label for="off-minute">Ausschalten bei Minute</label>
+        <select id="off-minute"></select>
+      </div>
+      <button class="btn" id="save-schedule">Zeitplan speichern</button>
+      <span class="save-msg" id="save-msg"></span>
+    </div>
+
+    <div class="preview">
+      Jede Stunde: Lüfter gehen um <strong id="preview-on">:25</strong> Uhr <strong>an</strong>
+      und um <strong id="preview-off">:40</strong> Uhr <strong>aus</strong>.
+    </div>
+  </div>
+
+  <footer>Manuelles Schalten pausiert die Automatik automatisch · Statusabfrage alle 4s</footer>
+</div>
+
+<script>
+const PINS = [
+  { pin: "17", name: "Lüfter 1" },
+  { pin: "27", name: "Lüfter 2" },
+  { pin: "22", name: "Lüfter 3" },
+  { pin: "23", name: "Lüfter 4" },
+];
+
+const fanGrid = document.getElementById("fan-grid");
+const masterToggle = document.getElementById("master-toggle");
+const connDot = document.getElementById("conn-dot");
+const connText = document.getElementById("conn-text");
+const automationStatusBadge = document.getElementById("automation-status-badge");
+const automationStatusText = document.getElementById("automation-status-text");
+const automationToggle = document.getElementById("automation-toggle");
+const automationSub = document.getElementById("automation-sub");
+
+const fanIconSVG = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+    <circle cx="12" cy="12" r="2"/>
+    <path d="M12 12c0-3 2-6 5-6 2 0 3 1.5 3 3.2 0 2.8-3 3.8-5 2.8"/>
+    <path d="M12 12c3 0 6 2 6 5 0 2-1.5 3-3.2 3-2.8 0-3.8-3-2.8-5"/>
+    <path d="M12 12c0 3-2 6-5 6-2 0-3-1.5-3-3.2 0-2.8 3-3.8 5-2.8"/>
+    <path d="M12 12c-3 0-6-2-6-5 0-2 1.5-3 3.2-3 2.8 0 3.8 3 2.8 5"/>
+  </svg>`;
+
+let suppressStatusPoll = false;
+let suppressAutomationPoll = false;
+
+PINS.forEach(({ pin, name }) => {
+  const card = document.createElement("div");
+  card.className = "fan-card";
+  card.id = `card-${pin}`;
+  card.innerHTML = `
+    <div class="glow"></div>
+    <div class="fan-icon-wrap">${fanIconSVG}</div>
+    <div class="fan-name">${name}</div>
+    <div class="fan-pin">GPIO ${pin}</div>
+    <label class="switch">
+      <input type="checkbox" id="toggle-${pin}" data-pin="${pin}">
+      <div class="track"><div class="thumb"></div></div>
+    </label>
+    <div class="fan-state-label" id="label-${pin}">–</div>
+  `;
+  fanGrid.appendChild(card);
+  card.querySelector(`#toggle-${pin}`).addEventListener("change", (e) => setFan(pin, e.target.checked));
+});
+
+function setConn(ok, text) {
+  connDot.className = "status-dot " + (ok ? "ok" : "err");
+  connText.textContent = text;
+}
+
+function updateFanUI(pin, on, excluded = false) {
+  const input = document.getElementById(`toggle-${pin}`);
+  const card = document.getElementById(`card-${pin}`);
+  const label = document.getElementById(`label-${pin}`);
+  input.checked = on;
+  card.classList.toggle("on", on);
+  const base = on ? "läuft" : "gestoppt";
+  label.textContent = excluded ? `${base} · manuell` : base;
+}
+
+function updateMasterUI(pinsStatus) {
+  const values = Object.values(pinsStatus);
+  masterToggle.checked = values.length > 0 && values.every(v => v === true);
+}
+
+let lastAutomationEnabled = false;
+let lastAutomationConfigured = true;
+
+function updateAutomationUI(enabled, configured = true) {
+  lastAutomationEnabled = enabled;
+  lastAutomationConfigured = configured;
+  automationToggle.checked = enabled;
+  renderAutomationBadge();
+}
+
+function renderAutomationBadge() {
+  const masterTimer = (typeof localTimers !== "undefined") ? localTimers["master"] : null;
+  const willReactivate = masterTimer && masterTimer.will_reactivate_automation;
+
+  automationStatusBadge.classList.remove("active", "paused", "pending");
+
+  if (willReactivate) {
+    // Ein laufender Timer wird die Automatik nach Ablauf von selbst
+    // wieder aktivieren - hier gibt's nichts zu klicken, nur zu warten.
+    automationStatusBadge.classList.add("pending");
+    automationStatusText.textContent = "Reaktiviert sich nach Timer von selbst";
+    automationSub.textContent = "Timer läuft – Automatik kommt danach automatisch zurück";
+  } else if (!lastAutomationConfigured) {
+    automationStatusBadge.classList.add("paused");
+    automationStatusText.textContent = "Kein Zeitplan gespeichert";
+    automationSub.textContent = "noch kein Zeitplan gespeichert – bitte unten einmal speichern";
+  } else if (lastAutomationEnabled) {
+    automationStatusBadge.classList.add("active");
+    automationStatusText.textContent = "Automatik aktiv";
+    automationSub.textContent = "Zeitplan schaltet die Lüfter stündlich automatisch";
+  } else {
+    automationStatusBadge.classList.add("paused");
+    automationStatusText.textContent = "Pausiert – klicken zum Aktivieren";
+    automationSub.textContent = "pausiert – manuelle Einstellung ist aktiv";
+  }
+}
+
+async function fetchStatus() {
+  try {
+    const res = await fetch("/api/status");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Fehler");
+    if (!suppressStatusPoll) {
+      const excludedSet = new Set(data.excluded_pins || []);
+      Object.entries(data.pins).forEach(([pin, on]) => updateFanUI(pin, on, excludedSet.has(pin)));
+      updateMasterUI(data.pins);
+    }
+    setConn(true, "verbunden");
+  } catch (e) {
+    setConn(false, "keine Verbindung zum Pi");
+  }
+}
+
+async function fetchAutomation() {
+  try {
+    const res = await fetch("/api/automation");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Fehler");
+    if (!suppressAutomationPoll) {
+      updateAutomationUI(data.enabled, data.configured !== false);
+    }
+  } catch (e) {
+    // still, keep last known state
+  }
+}
+
+async function setFan(pin, state) {
+  suppressStatusPoll = true;
+  suppressAutomationPoll = true;
+  const input = document.getElementById(`toggle-${pin}`);
+  input.disabled = true;
+  let ok = false;
+  try {
+    const res = await fetch(`/api/fan/${pin}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    updateFanUI(pin, data.state);
+    ok = true;
+  } catch (e) {
+    setConn(false, "Schaltvorgang fehlgeschlagen");
+    input.checked = !state;
+  } finally {
+    input.disabled = false;
+    suppressStatusPoll = false;
+    suppressAutomationPoll = false;
+  }
+  if (ok) {
+    fetchAutomation(); // Zeitplan läuft für die übrigen (und oft auch diesen) Lüfter meist weiter
+    fetchTimerStatus();
+  }
+}
+
+masterToggle.addEventListener("change", async () => {
+  suppressStatusPoll = true;
+  suppressAutomationPoll = true;
+  masterToggle.disabled = true;
+  const state = masterToggle.checked;
+  try {
+    const res = await fetch("/api/all", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    PINS.forEach(({ pin }) => updateFanUI(pin, data.state));
+    updateAutomationUI(false);
+    fetchTimerStatus(); // alle laufenden Timer wurden serverseitig abgebrochen
+  } catch (e) {
+    setConn(false, "Schaltvorgang fehlgeschlagen");
+    masterToggle.checked = !state;
+  } finally {
+    masterToggle.disabled = false;
+    suppressStatusPoll = false;
+    suppressAutomationPoll = false;
+  }
+});
+
+async function setAutomation(enabled) {
+  suppressAutomationPoll = true;
+  automationToggle.disabled = true;
+  try {
+    const res = await fetch("/api/automation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    updateAutomationUI(data.enabled);
+    if (data.on_minute !== null && data.on_minute !== undefined) onSelect.value = data.on_minute;
+    if (data.off_minute !== null && data.off_minute !== undefined) offSelect.value = data.off_minute;
+    updatePreview();
+  } catch (e) {
+    setConn(false, "Automatik konnte nicht geändert werden");
+    updateAutomationUI(!enabled);
+  } finally {
+    automationToggle.disabled = false;
+    suppressAutomationPoll = false;
+  }
+}
+
+automationToggle.addEventListener("change", (e) => setAutomation(e.target.checked));
+automationStatusBadge.addEventListener("click", () => {
+  if (automationStatusBadge.classList.contains("paused")) {
+    setAutomation(true);
+  }
+});
+
+// ---- Zeitplan ----
+const onSelect = document.getElementById("on-minute");
+const offSelect = document.getElementById("off-minute");
+const previewOn = document.getElementById("preview-on");
+const previewOff = document.getElementById("preview-off");
+const saveBtn = document.getElementById("save-schedule");
+const saveMsg = document.getElementById("save-msg");
+
+for (let m = 0; m < 60; m++) {
+  const opt1 = document.createElement("option");
+  opt1.value = m; opt1.textContent = `:${String(m).padStart(2, "0")}`;
+  onSelect.appendChild(opt1);
+  const opt2 = document.createElement("option");
+  opt2.value = m; opt2.textContent = `:${String(m).padStart(2, "0")}`;
+  offSelect.appendChild(opt2);
+}
+
+function updatePreview() {
+  previewOn.textContent = `:${String(onSelect.value).padStart(2, "0")}`;
+  previewOff.textContent = `:${String(offSelect.value).padStart(2, "0")}`;
+}
+onSelect.addEventListener("change", updatePreview);
+offSelect.addEventListener("change", updatePreview);
+
+async function fetchSchedule() {
+  try {
+    const res = await fetch("/api/schedule");
+    const data = await res.json();
+    if (data.on_minute !== null && data.on_minute !== undefined) onSelect.value = data.on_minute;
+    if (data.off_minute !== null && data.off_minute !== undefined) offSelect.value = data.off_minute;
+    updatePreview();
+  } catch (e) {
+    saveMsg.textContent = "Zeitplan konnte nicht geladen werden";
+    saveMsg.className = "save-msg err";
+  }
+}
+
+saveBtn.addEventListener("click", async () => {
+  saveBtn.disabled = true;
+  saveMsg.textContent = "speichere…";
+  saveMsg.className = "save-msg";
+  try {
+    const res = await fetch("/api/schedule", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        on_minute: parseInt(onSelect.value, 10),
+        off_minute: parseInt(offSelect.value, 10),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Fehler");
+    saveMsg.textContent = "gespeichert ✓";
+    saveMsg.className = "save-msg ok";
+    updatePreview();
+  } catch (e) {
+    saveMsg.textContent = "Fehler: " + e.message;
+    saveMsg.className = "save-msg err";
+  } finally {
+    saveBtn.disabled = false;
+    setTimeout(() => { saveMsg.textContent = ""; }, 4000);
+  }
+});
+
+// ---- Timer (eigener Bereich unter den Lüftern) ----
+const TARGETS = [
+  { scope: "master", label: "Alle Lüfter" },
+];
+const PRESET_MINUTES = [5, 15, 30, 60];
+
+const timerRowsEl = document.getElementById("timer-rows");
+let localTimers = {}; // scope -> { remaining_seconds, duration_minutes }
+
+function formatSeconds(totalSeconds) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+// Baut die Timer-Zeile einmalig auf
+TARGETS.forEach(({ scope }) => {
+  PRESET_MINUTES.forEach((m) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "timer-btn";
+    btn.dataset.scope = scope;
+    btn.dataset.minutes = m;
+    btn.textContent = `${m}m`;
+    timerRowsEl.appendChild(btn);
+  });
+});
+
+function renderTimerRow(scope) {
+  const info = localTimers[scope];
+
+  timerRowsEl.querySelectorAll(`.timer-btn[data-scope="${scope}"]`).forEach((btn) => {
+    const minutes = parseFloat(btn.dataset.minutes);
+    const isActive = info && Math.abs(info.duration_minutes - minutes) < 0.01;
+    btn.classList.toggle("running", !!isActive);
+    btn.textContent = isActive ? formatSeconds(info.remaining_seconds) : `${minutes}m`;
+  });
+}
+
+async function fetchTimerStatus() {
+  try {
+    const res = await fetch("/api/timer/status");
+    const data = await res.json();
+    localTimers = data.timers || {};
+    TARGETS.forEach(({ scope }) => renderTimerRow(scope));
+    renderAutomationBadge();
+  } catch (e) {
+    // nächster Poll versucht es erneut
+  }
+}
+
+function tickLocalTimers() {
+  const scopes = Object.keys(localTimers);
+  if (scopes.length === 0) return;
+
+  let stillRunning = false;
+  scopes.forEach((scope) => {
+    const info = localTimers[scope];
+    if (info.remaining_seconds > 0) {
+      info.remaining_seconds -= 1;
+      renderTimerRow(scope);
+      stillRunning = true;
+    }
+  });
+
+  if (!stillRunning) {
+    fetchTimerStatus();
+    fetchStatus();
+    fetchAutomation();
+  }
+}
+
+async function startTimerFor(scope, minutes) {
+  try {
+    const res = await fetch("/api/timer/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope, duration_minutes: minutes }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Fehler");
+    await fetchTimerStatus();
+    await fetchStatus();
+    await fetchAutomation();
+  } catch (e) {
+    setConn(false, "Timer konnte nicht gestartet werden");
+  }
+}
+
+async function cancelTimer(scope) {
+  try {
+    await fetch("/api/timer/cancel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope }),
+    });
+  } finally {
+    await fetchTimerStatus();
+    await fetchStatus();
+  }
+}
+
+// Klick auf Preset: gleiche laufende Dauer -> abbrechen, sonst (neu) starten
+timerRowsEl.addEventListener("click", (e) => {
+  const btn = e.target.closest(".timer-btn");
+  if (!btn) return;
+  const scope = btn.dataset.scope;
+  const minutes = parseFloat(btn.dataset.minutes);
+  const info = localTimers[scope];
+  const isThisOneRunning = info && Math.abs(info.duration_minutes - minutes) < 0.01;
+
+  if (isThisOneRunning) {
+    cancelTimer(scope);
+  } else {
+    startTimerFor(scope, minutes);
+  }
+});
+
+// Init
+fetchStatus();
+fetchSchedule();
+fetchAutomation();
+fetchTimerStatus();
+setInterval(fetchStatus, 4000);
+setInterval(fetchAutomation, 4000);
+setInterval(fetchTimerStatus, 4000);
+setInterval(tickLocalTimers, 1000);
+</script>
+</body>
+</html>

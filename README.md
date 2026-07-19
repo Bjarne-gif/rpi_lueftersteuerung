@@ -1,10 +1,11 @@
-# 🌬️ rpi_lueftersteuerung
+# rpi_lueftersteuerung
 
 ## Beschreibung
 GPIO Steuerung für Raspberry PI Lüfter (4 Stk) im 10 zoll Rack.
 
-## Promotion
-🎥 https://www.youtube.com/shorts/G2Y0PIfUGNg
+## Promotion 🎥 
+
+https://www.youtube.com/shorts/G2Y0PIfUGNg
 
 ## Hardware
 * **Raspberry Pi 5** (16 GB)

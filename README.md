@@ -7,6 +7,8 @@ Steuerung erfolgt über GUI im Browser gehostet auf dem RPI. (Port 5000)
 
 Docker Unterstützung wird nachdem ein sehr stabiler Zustand der Applikation erreicht ist nachträglich umgesetzt.
 
+Anleitung zur Einrichtung befindet sich in README_more.md.
+
 ## Promotion 🎥 
 
 https://www.youtube.com/shorts/G2Y0PIfUGNg

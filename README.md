@@ -20,6 +20,6 @@ https://www.youtube.com/shorts/G2Y0PIfUGNg
 
 ## ACHTUNG ⚠️
 
-Falsche verkabelung der Lüfter kann zu Schaden an der Hardware führen bitte beachtet das! 
+Falsche Verkabelung der Lüfter kann zu Schaden an der Hardware führen, bitte beachtet das! 
 
 Eine Dokumentation zur Verkabelung für den RPI4b und RPI5 werden bald hier hinzugefügt.

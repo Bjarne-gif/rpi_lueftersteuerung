@@ -17,3 +17,9 @@ https://www.youtube.com/shorts/G2Y0PIfUGNg
 * **Tecmojo 10-Zoll Belüftete 1HE-Blindblende** – Für Rackmontage, Blindblende aus Stahl für 10-Zoll breite Serverschränke, Netzwerkschränke, Rechenzentren, Heimlabore, Schwarz (2 Stück)
 * **AZDelivery Jumper Wire Kabel** – 20 cm F2M Female to Male, kompatibel mit Arduino und Raspberry Pi Breadboard
 * **WAGO Verbindungsklemmen 221-413** – 3 Leiter, bis 4 mm², COMPACT Kabelverbinder mit Hebel für alle Leiterarten weltweit, transparente Kabelverbinder mit Prüföffnung, werkzeuglose Installation
+
+## ACHTUNG
+
+Falsche verkabelung der Lüfter kann zu Schaden an der Hardware führen bitte beachtet das! 
+
+Eine Dokumentation zur Verkabelung für den RPI4b und RPI5 werden bald hier hinzugefügt.

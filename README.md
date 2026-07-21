@@ -20,7 +20,7 @@ https://www.youtube.com/shorts/G2Y0PIfUGNg
 * **AZDelivery Jumper Wire Kabel** – 20 cm F2M Female to Male, kompatibel mit Arduino und Raspberry Pi Breadboard
 * **WAGO Verbindungsklemmen 221-413** – 3 Leiter, bis 4 mm², COMPACT Kabelverbinder mit Hebel für alle Leiterarten weltweit, transparente Kabelverbinder mit Prüföffnung, werkzeuglose Installation
 
-## ACHTUNG ⚠️
+## ACHTUNG
 
 Falsche Verkabelung der Lüfter kann zu Schaden an der Hardware führen, bitte beachtet das! 
 

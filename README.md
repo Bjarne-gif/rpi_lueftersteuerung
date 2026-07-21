@@ -1,6 +1,6 @@
-# Raspberry Pi Lüftersteuerung 💨
+# Raspberry Pi Lüftersteuerung 
 
-## Beschreibung 📝
+## Beschreibung
 GPIO Steuerung für Raspberry PI Lüfter (4 Stk) im 10 zoll Rack.
 
 Steuerung erfolgt über GUI im Browser gehostet auf dem RPI. (Port 5000)
@@ -9,11 +9,11 @@ Docker Unterstützung wird nachdem ein sehr stabiler Zustand der Applikation err
 
 Anleitung zur Einrichtung befindet sich in README_more.md.
 
-## Promotion 🎥 
+## Promotion
 
 https://www.youtube.com/shorts/G2Y0PIfUGNg
 
-## Hardware 💻
+## Hardware
 * **Raspberry Pi 5** (16 GB)
 * **GeeekPi 2PCS Raspberry Pi 4 Lüfter** – DC 5V Brushless RGB CPU PWM Lüfter mit blauer Hintergrundbeleuchtung (40x40x10mm, für Raspberry Pi 4 Modell B, 3B+, Raspberry Pi 3/2 Modell B, Gefärbt) 
 * **Tecmojo 10-Zoll Belüftete 1HE-Blindblende** – Für Rackmontage, Blindblende aus Stahl für 10-Zoll breite Serverschränke, Netzwerkschränke, Rechenzentren, Heimlabore, Schwarz (2 Stück)

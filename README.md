@@ -10,10 +10,6 @@ Docker Unterstützung wird nachdem ein sehr stabiler Zustand der Applikation err
 
 Anleitung zur Einrichtung befindet sich in README_more.md.
 
-## Promotion
-
-https://www.youtube.com/shorts/G2Y0PIfUGNg
-
 ## Hardware
 >**Raspberry Pi 5** (16 GB)
 
@@ -24,6 +20,10 @@ https://www.youtube.com/shorts/G2Y0PIfUGNg
 >**AZDelivery Jumper Wire Kabel** – 20 cm F2M Female to Male, kompatibel mit Arduino und Raspberry Pi Breadboard
 
 >**WAGO Verbindungsklemmen 221-413** – 3 Leiter, bis 4 mm², COMPACT Kabelverbinder mit Hebel für alle Leiterarten weltweit, transparente Kabelverbinder mit Prüföffnung, werkzeuglose Installation
+
+## Promotion
+
+https://www.youtube.com/shorts/G2Y0PIfUGNg
 
 ## WICHTIGE HINWEISE
 

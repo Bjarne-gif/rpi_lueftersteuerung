@@ -1,4 +1,5 @@
 
+
 # Raspberry Pi Lüftersteuerung 
 
 ## Beschreibung
@@ -33,4 +34,4 @@ Eine Dokumentation zur Verkabelung für den RPI4b und RPI5 werden bald hier hinz
 
 ## GUI 
 
-<img width="1040" height="1182" alt="luft" src="https://github.com/user-attachments/assets/fa96457f-d7ee-4707-b3af-7ad115d30586" />
+<img width="1020" height="1171" alt="luft" src="https://github.com/user-attachments/assets/df777c94-aba7-474d-b86b-e14f3edb0729" />

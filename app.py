@@ -17,6 +17,8 @@ import json
 import datetime
 import logging
 import threading
+import time
+import uuid
 from flask import Flask, jsonify, request, render_template
 import subprocess
 
@@ -34,6 +36,14 @@ STATE_FILE = os.environ.get(
 EXCLUDED_FILE = os.environ.get(
     "EXCLUDED_PINS_FILE",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "excluded_pins.json"),
+)
+RUNTIME_FILE = os.environ.get(
+    "RUNTIME_FILE",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "fan_runtime.json"),
+)
+SEQUENCES_FILE = os.environ.get(
+    "SEQUENCES_FILE",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "sequences.json"),
 )
 
 GPIOCHIP = os.environ.get("GPIOCHIP", "0")
@@ -266,6 +276,83 @@ pin_state = load_pin_state()
 
 # {pin: iso_timestamp} - temporär vom Zeitplan ausgenommene Pins.
 excluded_pins = load_excluded_pins()
+
+
+def load_runtime():
+    """Lädt die bisher aufsummierte Laufzeit pro Pin in Sekunden."""
+    try:
+        with open(RUNTIME_FILE) as f:
+            data = json.load(f)
+        return {p: float(data.get(p, 0)) for p in PIN_ORDER}
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
+        return {p: 0.0 for p in PIN_ORDER}
+
+
+def save_runtime(data):
+    try:
+        with open(RUNTIME_FILE, "w") as f:
+            json.dump(data, f)
+    except OSError:
+        pass
+
+
+# Aufsummierte Laufzeit pro Pin in Sekunden (persistiert).
+runtime_seconds = load_runtime()
+runtime_lock = threading.Lock()
+
+
+def load_sequences():
+    """Lädt die gespeicherten Sequenzen: {id: {"id", "name", "steps", "loop"}}."""
+    try:
+        with open(SEQUENCES_FILE) as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, TypeError):
+        return {}
+
+
+def save_sequences(data):
+    try:
+        with open(SEQUENCES_FILE, "w") as f:
+            json.dump(data, f)
+    except OSError:
+        pass
+
+
+# Gespeicherte Sequenz-Definitionen (persistiert).
+sequences = load_sequences()
+
+# Aktuell laufende Sequenz (nur eine gleichzeitig) - None wenn keine läuft.
+sequence_lock = threading.RLock()
+running_sequence = None
+
+
+def _runtime_tracker_loop():
+    """Läuft dauerhaft im Hintergrund und prüft alle 20s, welche Lüfter
+    gerade laufen (über get_current_pin_values - funktioniert egal ob
+    das über Zeitplan, manuell oder Timer zustande kommt) und zählt die
+    Zeit hoch. Grobe Genauigkeit (20s-Raster) reicht für eine
+    Wartungs-Schätzung völlig aus."""
+    interval = 20
+    last_check = time.monotonic()
+    while True:
+        time.sleep(interval)
+        now = time.monotonic()
+        elapsed = now - last_check
+        last_check = now
+        try:
+            pins, _source = get_current_pin_values()
+        except Exception:
+            continue
+        with runtime_lock:
+            changed = False
+            for pin, is_on in pins.items():
+                if is_on:
+                    runtime_seconds[pin] = runtime_seconds.get(pin, 0.0) + elapsed
+                    changed = True
+            if changed:
+                save_runtime(runtime_seconds)
+
 
 # Aktive Sicherheits-Timer: scope ("master" oder Pin-Nummer) -> Infos.
 # RLock (nicht Lock), da get_current_pin_values() innerhalb eines schon
@@ -539,9 +626,10 @@ def set_schedule():
     except (TypeError, ValueError, AssertionError):
         return jsonify({"error": "Minuten müssen zwischen 0 und 59 liegen"}), 400
 
-    # Laufende Timer hätten sonst einen jetzt veralteten Vorzustand
-    # gespeichert und würden ihn später fälschlich wiederherstellen.
+    # Laufende Timer/Sequenzen hätten sonst einen jetzt veralteten
+    # Vorzustand gespeichert und würden ihn später fälschlich wiederherstellen.
     cancel_all_timers()
+    stop_running_sequence()
 
     # aktuellen Enabled-Status beibehalten (Standard: aktiv, falls noch nichts existiert)
     current = parse_cron_state(read_crontab_text())
@@ -587,11 +675,22 @@ def set_automation():
         for entry in active_timers.values():
             timer_held_pins.update(entry["pins"])
 
+    with sequence_lock:
+        sequence_running = running_sequence is not None
+
+    if timer_held_pins or sequence_running:
+        # Solange ein Timer oder eine Sequenz läuft, hat der
+        # Automatik-Schalter keine Funktion - er wird danach automatisch
+        # wieder normal nutzbar. Das Frontend sperrt den Schalter dafür
+        # bereits, das hier ist nur die serverseitige Absicherung.
+        return jsonify({"error": "Automatik kann nicht geändert werden, solange ein Timer/eine Sequenz läuft"}), 409
+
     if not enabled:
         # Explizites Deaktivieren ist eine bewusste "alles überschreiben"-
         # Aktion - ein laufender Timer würde sonst mit einer jetzt
         # veralteten Referenz weiterlaufen.
         cancel_all_timers()
+        stop_running_sequence()
         timer_held_pins = set()
 
     current = parse_cron_state(read_crontab_text())
@@ -691,13 +790,12 @@ def _revert_to_previous(entry):
     passenden Zielzustand her. Prüft dabei den AKTUELLEN Automatik-Status
     (nicht den von Timer-Start!) - wurde die Automatik z.B. WÄHREND der
     Timer lief aktiviert, übernimmt sie diese Pins jetzt direkt mit
-    sofortigem Sync, statt sie hart auszuschalten."""
-    released = False
+    sofortigem Sync, statt sie hart auszuschalten. Pins, die schon VOR
+    dem Timer individuell ausgenommen waren (z.B. ein manuell
+    ausgeschalteter Lüfter), kehren in genau diesen Zustand zurück,
+    statt pauschal dem Zeitplan zu folgen."""
     for p in entry["pins"]:
-        if excluded_pins.pop(p, None) is not None:
-            released = True
-    if released:
-        save_excluded_pins(excluded_pins)
+        excluded_pins.pop(p, None)
 
     current = parse_cron_state(read_crontab_text())
     automation_now_active = bool(
@@ -708,12 +806,30 @@ def _revert_to_previous(entry):
     if automation_now_active:
         on_minute = current["on_minute"]
         off_minute = current["off_minute"]
-        # Cronjob-Befehl neu schreiben, damit er ab sofort auch diese
-        # Pins wieder normal mitsteuert (Ausnahme wurde ja gerade
-        # aufgehoben).
+        pre_existing = entry.get("pre_existing_exclusions") or {}
+
+        if pre_existing:
+            now_iso = datetime.datetime.now().isoformat()
+            pins_on = [p for p, v in pre_existing.items() if v]
+            pins_off = [p for p, v in pre_existing.items() if not v]
+            if pins_on:
+                apply_pin_values(pins_on, True)
+            if pins_off:
+                apply_pin_values(pins_off, False)
+            for p in pre_existing:
+                excluded_pins[p] = now_iso
+
+        save_excluded_pins(excluded_pins)
+
+        # Cronjob-Befehl neu schreiben (berücksichtigt die gerade wieder
+        # gesetzten Ausnahmen), dann die übrigen Pins direkt auf den
+        # aktuellen Zeitplan-Wert bringen.
         write_cron_block(on_minute, off_minute, enabled=True)
-        apply_automation_sync(on_minute, off_minute, entry["pins"])
+        sync_pins = [p for p in entry["pins"] if p not in pre_existing]
+        if sync_pins:
+            apply_automation_sync(on_minute, off_minute, sync_pins)
     else:
+        save_excluded_pins(excluded_pins)
         apply_pin_values(entry["pins"], False)
 
 
@@ -724,6 +840,66 @@ def _timer_expired(scope):
     if not entry:
         return
     _revert_to_previous(entry)
+
+
+def stop_running_sequence():
+    """Bricht eine ggf. laufende Sequenz ab und stellt den Zustand von
+    davor wieder her (gleiche Logik wie beim Timer)."""
+    global running_sequence
+    with sequence_lock:
+        info = running_sequence
+        if not info:
+            return
+        info["stop_event"].set()
+        running_sequence = None
+    _revert_to_previous({
+        "pins": info["participating_pins"],
+        "pre_existing_exclusions": info["pre_existing_exclusions"],
+    })
+
+
+def _run_sequence(seq_id, stop_event, steps, loop, participating_pins):
+    """Läuft in einem eigenen Hintergrund-Thread: arbeitet die Schritte
+    der Reihe nach ab (optional als Endlos-Schleife). Ein externer Stop
+    (stop_event) übernimmt selbst das Aufräumen/Wiederherstellen - der
+    Thread hier beendet sich dann einfach nur still."""
+    global running_sequence
+    while True:
+        for idx, step in enumerate(steps):
+            with sequence_lock:
+                if running_sequence is None or running_sequence.get("id") != seq_id:
+                    return
+                running_sequence["current_step_index"] = idx
+                running_sequence["step_end_time"] = (
+                    datetime.datetime.now() + datetime.timedelta(minutes=step["duration_minutes"])
+                )
+
+            step_pins = step["pins"]
+            off_pins = [p for p in participating_pins if p not in step_pins]
+            if step_pins:
+                apply_pin_values(step_pins, True)
+            if off_pins:
+                apply_pin_values(off_pins, False)
+
+            remaining = step["duration_minutes"] * 60
+            while remaining > 0:
+                if stop_event.wait(timeout=min(1, remaining)):
+                    return  # extern gestoppt - Aufräumen übernimmt der Stopper
+                remaining -= 1
+
+        if not loop:
+            break
+
+    # Sequenz ist von selbst (ohne Loop) zu Ende -> hier selbst aufräumen
+    with sequence_lock:
+        info = running_sequence
+        if info and info.get("id") == seq_id:
+            running_sequence = None
+    if info:
+        _revert_to_previous({
+            "pins": info["participating_pins"],
+            "pre_existing_exclusions": info["pre_existing_exclusions"],
+        })
 
 
 @app.route("/api/timer/start", methods=["POST"])
@@ -741,6 +917,10 @@ def start_timer():
 
     pins = list(PIN_ORDER) if scope == "master" else [scope]
 
+    # Timer und Sequenz schließen sich gegenseitig aus - eine laufende
+    # Sequenz sauber beenden (mit Wiederherstellung), bevor der Timer startet.
+    stop_running_sequence()
+
     with timers_lock:
         existing = active_timers.get(scope)
 
@@ -755,21 +935,36 @@ def start_timer():
             on_minute = existing["on_minute"]
             off_minute = existing["off_minute"]
             previous_pins = existing["previous_pins"]
+            pre_existing_exclusions = existing.get("pre_existing_exclusions") or {}
         else:
             # Erster Start für diesen Scope -> jetzigen Zustand als
             # "vorher" merken
             cron_state = parse_cron_state(read_crontab_text())
             was_automation_active = bool(cron_state["found"] and cron_state["enabled"])
             previous_pins = None
+            pre_existing_exclusions = {}
             on_minute = off_minute = None
             if was_automation_active:
                 on_minute = cron_state["on_minute"]
                 off_minute = cron_state["off_minute"]
+                # Pins merken, die schon VOR dem Timer individuell
+                # ausgenommen waren (z.B. ein manuell ausgeschalteter
+                # Lüfter) - die sollen nach Timer-Ende wieder in genau
+                # diesen Zustand zurückkehren, statt pauschal dem
+                # Zeitplan zu folgen.
+                pre_existing_exclusions = {
+                    p: pin_state.get(p, False) for p in pins if p in excluded_pins
+                }
             else:
                 current_values, _source = get_current_pin_values()
                 previous_pins = {p: current_values[p] for p in pins}
 
-        ensure_automation_disabled()
+        if was_automation_active:
+            # NUR diese Pins aus dem Zeitplan ausnehmen - der Zeitplan
+            # selbst bleibt "ENABLED" und reaktiviert sie beim Timer-Ende
+            # automatisch wieder (siehe _revert_to_previous).
+            exclude_pins_from_automation(pins)
+
         result = apply_pin_values(pins, True)
         if result.returncode != 0:
             return jsonify({"error": result.stderr.strip() or "gpioset fehlgeschlagen"}), 500
@@ -785,6 +980,7 @@ def start_timer():
             "pins": pins,
             "duration_minutes": duration_minutes,
             "was_automation_active": was_automation_active,
+            "pre_existing_exclusions": pre_existing_exclusions,
             "on_minute": on_minute,
             "off_minute": off_minute,
             "previous_pins": previous_pins,
@@ -812,6 +1008,12 @@ def cancel_timer():
 @app.route("/api/timer/status", methods=["GET"])
 def timer_status():
     now = datetime.datetime.now()
+    # Live-Status statt des eingefrorenen Werts von Timer-Start: wurde die
+    # Automatik WÄHREND der Timer lief aktiviert, muss die Anzeige das
+    # sofort als "reaktiviert sich" zeigen, nicht erst nach Timer-Ende.
+    current = parse_cron_state(read_crontab_text())
+    automation_currently_active = bool(current["found"] and current["enabled"])
+
     with timers_lock:
         result = {}
         for scope, entry in active_timers.items():
@@ -820,9 +1022,173 @@ def timer_status():
                 "end_time": entry["end_time"].isoformat(),
                 "remaining_seconds": max(0, remaining),
                 "duration_minutes": entry.get("duration_minutes"),
-                "will_reactivate_automation": bool(entry.get("was_automation_active")),
+                "will_reactivate_automation": automation_currently_active,
             }
     return jsonify({"timers": result})
+
+
+@app.route("/api/runtime", methods=["GET"])
+def get_runtime():
+    with runtime_lock:
+        hours = {p: round(runtime_seconds.get(p, 0.0) / 3600, 1) for p in PIN_ORDER}
+    return jsonify({"hours": hours})
+
+
+@app.route("/api/runtime/reset", methods=["POST"])
+def reset_runtime():
+    data = request.get_json(silent=True) or {}
+    pin = data.get("pin")
+    with runtime_lock:
+        if pin == "all":
+            for p in PIN_ORDER:
+                runtime_seconds[p] = 0.0
+        elif pin in PIN_ORDER:
+            runtime_seconds[pin] = 0.0
+        else:
+            return jsonify({"error": "Ungültiger Pin"}), 400
+        save_runtime(runtime_seconds)
+        hours = {p: round(runtime_seconds.get(p, 0.0) / 3600, 1) for p in PIN_ORDER}
+    return jsonify({"hours": hours})
+
+
+def _validate_sequence_payload(data):
+    name = (data.get("name") or "").strip()
+    if not name:
+        raise ValueError("Bitte einen Namen vergeben")
+
+    steps_in = data.get("steps") or []
+    if not isinstance(steps_in, list) or not steps_in:
+        raise ValueError("Mindestens ein Schritt nötig")
+
+    steps = []
+    for raw_step in steps_in:
+        pins = [p for p in (raw_step.get("pins") or []) if p in PIN_ORDER]
+        if not pins:
+            raise ValueError("Jeder Schritt braucht mindestens einen Lüfter")
+        try:
+            duration = float(raw_step.get("duration_minutes"))
+            assert 0 < duration <= 24 * 60
+        except (TypeError, ValueError, AssertionError):
+            raise ValueError("Ungültige Dauer in einem Schritt (1–1440 Minuten)")
+        steps.append({"pins": pins, "duration_minutes": duration})
+
+    loop = bool(data.get("loop"))
+    return name, steps, loop
+
+
+@app.route("/api/sequences", methods=["GET"])
+def list_sequences():
+    return jsonify({"sequences": sequences})
+
+
+@app.route("/api/sequences", methods=["POST"])
+def save_sequence():
+    data = request.get_json(silent=True) or {}
+    try:
+        name, steps, loop = _validate_sequence_payload(data)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    seq_id = data.get("id") or uuid.uuid4().hex[:8]
+    sequences[seq_id] = {"id": seq_id, "name": name, "steps": steps, "loop": loop}
+    save_sequences(sequences)
+    return jsonify({"sequence": sequences[seq_id]})
+
+
+@app.route("/api/sequences/<seq_id>", methods=["DELETE"])
+def delete_sequence(seq_id):
+    if seq_id not in sequences:
+        return jsonify({"error": "Sequenz nicht gefunden"}), 404
+    with sequence_lock:
+        if running_sequence and running_sequence.get("id") == seq_id:
+            stop_running_sequence()
+    sequences.pop(seq_id, None)
+    save_sequences(sequences)
+    return jsonify({"deleted": True})
+
+
+@app.route("/api/sequences/<seq_id>/start", methods=["POST"])
+def start_sequence(seq_id):
+    global running_sequence
+
+    seq = sequences.get(seq_id)
+    if not seq:
+        return jsonify({"error": "Sequenz nicht gefunden"}), 404
+
+    steps = seq["steps"]
+    loop = seq.get("loop", False)
+    participating_pins = sorted(set(p for step in steps for p in step["pins"]))
+
+    # Timer und Sequenz schließen sich gegenseitig aus.
+    cancel_all_timers()
+    # Eine ggf. schon laufende (andere) Sequenz sauber beenden.
+    stop_running_sequence()
+
+    with sequence_lock:
+        cron_state = parse_cron_state(read_crontab_text())
+        was_automation_active = bool(cron_state["found"] and cron_state["enabled"])
+        pre_existing_exclusions = {}
+        if was_automation_active:
+            pre_existing_exclusions = {
+                p: pin_state.get(p, False) for p in participating_pins if p in excluded_pins
+            }
+            exclude_pins_from_automation(participating_pins)
+
+        stop_event = threading.Event()
+        running_sequence = {
+            "id": seq_id,
+            "name": seq["name"],
+            "steps": steps,
+            "loop": loop,
+            "participating_pins": participating_pins,
+            "pre_existing_exclusions": pre_existing_exclusions,
+            "current_step_index": 0,
+            "step_end_time": None,
+            "stop_event": stop_event,
+        }
+        thread = threading.Thread(
+            target=_run_sequence,
+            args=(seq_id, stop_event, steps, loop, participating_pins),
+            daemon=True,
+        )
+        thread.start()
+
+    return jsonify({"started": True, "id": seq_id, "name": seq["name"]})
+
+
+@app.route("/api/sequences/stop", methods=["POST"])
+def stop_sequence():
+    with sequence_lock:
+        was_running = running_sequence is not None
+    stop_running_sequence()
+    return jsonify({"stopped": was_running})
+
+
+@app.route("/api/sequences/status", methods=["GET"])
+def sequence_status():
+    with sequence_lock:
+        info = running_sequence
+        if not info:
+            return jsonify({"running": None})
+        remaining = None
+        if info.get("step_end_time"):
+            remaining = max(0, int((info["step_end_time"] - datetime.datetime.now()).total_seconds()))
+        return jsonify({
+            "running": {
+                "id": info["id"],
+                "name": info["name"],
+                "current_step_index": info["current_step_index"],
+                "total_steps": len(info["steps"]),
+                "current_step_pins": info["steps"][info["current_step_index"]]["pins"],
+                "remaining_seconds": remaining,
+                "loop": info["loop"],
+            }
+        })
+
+
+# Laufzeit-Tracker im Hintergrund starten (läuft dauerhaft mit der App).
+runtime_thread = threading.Thread(target=_runtime_tracker_loop, daemon=True)
+runtime_thread.start()
 
 
 if __name__ == "__main__":

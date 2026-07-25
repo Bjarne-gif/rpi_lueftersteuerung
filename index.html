@@ -65,7 +65,6 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 10px;
-    margin-bottom: 4px;
   }
   .schedule-header h2 { margin: 0; }
 
@@ -115,6 +114,12 @@
   }
   .master-card .label { display: flex; align-items: center; gap: 14px; }
   .master-card .label .fan-icon { width: 34px; height: 34px; color: var(--accent); }
+
+  .title-block h1 { display: flex; align-items: center; gap: 10px; }
+  .title-icon { width: 50px; height: 34px; color: var(--accent); flex-shrink: 0; }
+
+  .card-header { display: flex; align-items: center; gap: 14px; }
+  .section-icon { width: 34px; height: 34px; color: var(--accent); flex-shrink: 0; }
   .master-card h2 { margin: 0; font-size: 18px; }
   .master-card span.sub { color: var(--muted); font-size: 13px; }
 
@@ -156,6 +161,17 @@
   .fan-card.on .fan-icon-wrap svg { color: var(--accent); animation: spin 0.9s linear infinite; }
   @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
 
+  /* Zeitplan-Icon: Uhrzeiger dreht sich, solange die Automatik aktiv ist */
+  .clock-hand { transform-box: fill-box; transform-origin: center; }
+  #schedule-icon.active .clock-hand { animation: clock-tick 4s linear infinite; }
+  @keyframes clock-tick { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+  /* Zeitplan-Icon: blau, solange ein Timer die Automatik sperrt */
+  #schedule-icon.locked { color: #8fb8ff; }
+
+  /* Timer-Icon: pulsiert, solange ein Timer läuft */
+  #timer-icon.active { animation: timer-pulse 1s ease-in-out infinite; }
+  @keyframes timer-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+
   .fan-name { font-weight: 600; font-size: 15px; }
   .fan-pin { color: var(--muted); font-size: 12px; letter-spacing: 0.5px; }
 
@@ -170,11 +186,24 @@
 
   .switch.warn input:checked + .track { background: linear-gradient(135deg, #b8791f, var(--warn)); box-shadow: 0 0 14px var(--warn-glow); }
 
+  /* Automatik-Schalter: blau statt ausgegraut, solange ein Timer sperrt */
+  .switch.locked input:disabled + .track {
+    opacity: 1; background: rgba(143,184,255,0.18); border-color: rgba(143,184,255,0.5);
+    box-shadow: 0 0 10px rgba(143,184,255,0.3);
+  }
+  .switch.locked input:disabled + .track .thumb { background: #8fb8ff; }
+
+  /* Speichern-Button: blau statt ausgegraut, solange ein Timer sperrt */
+  #save-schedule.locked:disabled {
+    opacity: 1; cursor: not-allowed; box-shadow: none;
+    background: linear-gradient(135deg, #4a7fd6, #8fb8ff); color: #04121f;
+  }
+
   .fan-state-label { font-size: 12px; color: var(--muted); min-height: 16px; }
 
   /* ---- Schedule card ---- */
   .schedule-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 24px; }
-  .schedule-card h2 { margin: 0 0 4px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  .schedule-card h2 { margin: 0; font-size: 18px; }
   .schedule-card p.hint { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
 
   .automation-row {
@@ -191,7 +220,7 @@
 
   /* ---- Timer-Karte ---- */
   .timer-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 24px; margin-bottom: 22px; }
-  .timer-card h2 { margin: 0 0 4px; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  .timer-card h2 { margin: 0; font-size: 18px; }
   .timer-card p.hint { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
 
   #timer-rows {
@@ -213,12 +242,63 @@
     border-color: transparent; font-weight: 700;
   }
 
+  /* ---- Laufzeit-Karte (im Stil der Master-Card) ---- */
+  .runtime-card {
+    background: linear-gradient(135deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 22px 26px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+    margin-bottom: 22px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .runtime-card .label { display: flex; align-items: center; gap: 14px; }
+  .runtime-card .label .runtime-icon { width: 34px; height: 34px; color: var(--accent); flex-shrink: 0; }
+  .runtime-card h2 { margin: 0; font-size: 18px; }
+  .runtime-card span.sub { color: var(--muted); font-size: 13px; }
+  .timer-card span.sub, .schedule-card span.sub { color: var(--muted); font-size: 13px; }
+  .timer-card .card-header { margin-bottom: 16px; }
+  .schedule-header { margin-bottom: 16px; }
+
+  .runtime-items { display: flex; gap: 20px; flex-wrap: wrap; }
+  .runtime-item { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+  .runtime-item .rt-label { color: var(--muted); }
+  .runtime-item .rt-value { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text); }
+  .runtime-reset-btn {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 13px; line-height: 1; padding: 2px; opacity: 0.6; transition: opacity .15s, color .15s;
+  }
+  .runtime-reset-btn:hover { opacity: 1; color: var(--danger); }
+
+  /* ---- Sequenz-Karte ---- */
+  .sequence-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 24px; margin-bottom: 22px; }
+  .sequence-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .sequence-item:first-of-type { border-top: none; }
+  .sequence-item-info strong { font-size: 14px; }
+  .sequence-item-info .sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .sequence-item-actions { display: flex; align-items: center; gap: 10px; }
+  .sequence-countdown { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); font-size: 13px; white-space: nowrap; }
+  .sequence-empty-hint { color: var(--muted); font-size: 13px; padding: 8px 0; }
+
+  .sequence-step-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+  .sequence-step-pins { display: flex; gap: 10px; font-size: 12px; color: var(--muted); }
+  .sequence-step-pins label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .sequence-step-duration { width: 64px; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+  .sequence-loop-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin: 10px 0; }
+  .sequence-name-input { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 10px; font-size: 14px; width: 100%; max-width: 260px; outline: none; }
+  .sequence-name-input:focus { border-color: var(--accent); }
+
 
   .schedule-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-end; margin-bottom: 18px; }
   .field { display: flex; flex-direction: column; gap: 6px; }
   .field label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
   .field select { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 10px; font-size: 14px; min-width: 120px; outline: none; }
   .field select:focus { border-color: var(--accent); }
+  .field select:disabled {
+    opacity: 1; cursor: not-allowed;
+    background: rgba(143,184,255,0.08); border-color: rgba(143,184,255,0.35); color: #8fb8ff;
+  }
 
   .preview { background: var(--panel-2); border: 1px dashed var(--border); border-radius: 12px; padding: 14px 16px; font-size: 13px; color: var(--muted); margin-bottom: 18px; }
   .preview strong { color: var(--text); }
@@ -240,7 +320,7 @@
 
   <header>
     <div class="title-block">
-      <h1>🌀 Lüftersteuerung Rack</h1>
+      <h1>Lüftersteuerung Rack</h1>
       <p>Raspberry Pi · GPIO-Chip 0 · Live-Steuerung</p>
     </div>
     <div class="status-pill">
@@ -271,21 +351,54 @@
 
   <div class="grid" id="fan-grid"></div>
 
+  <div class="runtime-card">
+    <div class="label">
+      <svg class="runtime-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M6 3h12"/>
+        <path d="M6 21h12"/>
+        <path d="M7 3c0 4.5 3 6.5 5 8-2 1.5-5 3.5-5 8h10c0-4.5-3-6.5-5-8 2-1.5 5-3.5 5-8"/>
+      </svg>
+      <div>
+        <h2>Laufzeit</h2>
+        <span class="sub">Gesamtstunden pro Lüfter</span>
+      </div>
+    </div>
+    <div class="runtime-items" id="runtime-items"></div>
+  </div>
+
   <div class="timer-card">
-    <h2>⏲️ Timer</h2>
-    <p class="hint">Klick = sofort an, nochmal klicken = abbrechen.</p>
+    <div class="card-header">
+      <svg class="section-icon" id="timer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <circle cx="12" cy="13" r="8"/>
+        <path d="M12 13V9"/>
+        <path d="M9 2h6"/>
+        <path d="M18.5 5.5l1.5-1.5"/>
+      </svg>
+      <div>
+        <h2>Timer</h2>
+        <span class="sub">Klick = sofort an, nochmal klicken = abbrechen.</span>
+      </div>
+    </div>
     <div id="timer-rows"></div>
   </div>
 
   <div class="schedule-card">
     <div class="schedule-header">
-      <h2>⏱️ Automatischer Zeitplan</h2>
+      <div class="card-header">
+        <svg class="section-icon" id="schedule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <circle cx="12" cy="12" r="9"/>
+          <path class="clock-hand" d="M12 7v5l3.5 3.5"/>
+        </svg>
+        <div>
+          <h2>Automatischer Zeitplan</h2>
+          <span class="sub">Stündlich wiederkehrend – entspricht deinem Cronjob (<code>sudo crontab -e</code>).</span>
+        </div>
+      </div>
       <span class="automation-status-badge" id="automation-status-badge">
         <span class="dot"></span>
         <span id="automation-status-text">lädt…</span>
       </span>
     </div>
-    <p class="hint">Stündlich wiederkehrend – entspricht deinem Cronjob (<code>sudo crontab -e</code>).</p>
 
     <div class="automation-row">
       <div class="label">
@@ -314,6 +427,46 @@
     <div class="preview">
       Jede Stunde: Lüfter gehen um <strong id="preview-on">:25</strong> Uhr <strong>an</strong>
       und um <strong id="preview-off">:40</strong> Uhr <strong>aus</strong>.
+    </div>
+  </div>
+
+  <div class="sequence-card">
+    <div class="card-header">
+      <svg class="section-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <circle cx="5" cy="7" r="1.6"/>
+        <circle cx="12" cy="12" r="1.6"/>
+        <circle cx="19" cy="17" r="1.6"/>
+        <path d="M6.4 8l5 3"/>
+        <path d="M13.4 13l5 3"/>
+      </svg>
+      <div>
+        <h2>Sequenzen</h2>
+        <span class="sub">Eigene Abfolgen aus mehreren Schritten, manuell startbar</span>
+      </div>
+    </div>
+
+    <div id="sequence-list"></div>
+
+    <button type="button" class="btn" id="sequence-new-btn" style="margin-top:14px;">+ Neue Sequenz</button>
+
+    <div id="sequence-builder" style="display:none; margin-top:18px; padding-top:18px; border-top:1px solid var(--border);">
+      <div class="field" style="margin-bottom:14px;">
+        <label for="sequence-name-input">Name</label><br>
+        <input type="text" id="sequence-name-input" class="sequence-name-input" placeholder="z.B. Testlauf" maxlength="40">
+      </div>
+
+      <div id="sequence-steps-container"></div>
+      <button type="button" class="timer-btn" id="sequence-add-step-btn">+ Schritt</button>
+
+      <label class="sequence-loop-row">
+        <input type="checkbox" id="sequence-loop-checkbox"> Endlos wiederholen (Loop)
+      </label>
+
+      <div style="display:flex; gap:10px; align-items:center; margin-top:8px;">
+        <button type="button" class="btn" id="sequence-save-btn">Speichern</button>
+        <button type="button" class="timer-btn" id="sequence-cancel-btn">Abbrechen</button>
+        <span class="save-msg" id="sequence-msg"></span>
+      </div>
     </div>
   </div>
 
@@ -400,26 +553,56 @@ function updateAutomationUI(enabled, configured = true) {
 
 function renderAutomationBadge() {
   const masterTimer = (typeof localTimers !== "undefined") ? localTimers["master"] : null;
+  const timerActive = !!masterTimer;
+  const sequenceActive = (typeof runningSequenceInfo !== "undefined") && !!runningSequenceInfo;
+  const lockedByOther = timerActive || sequenceActive;
   const willReactivate = masterTimer && masterTimer.will_reactivate_automation;
 
   automationStatusBadge.classList.remove("active", "paused", "pending");
+  automationToggle.disabled = lockedByOther;
 
-  if (willReactivate) {
-    // Ein laufender Timer wird die Automatik nach Ablauf von selbst
-    // wieder aktivieren - hier gibt's nichts zu klicken, nur zu warten.
+  // "Zeitplan speichern" genauso sperren, solange ein Timer oder eine Sequenz läuft.
+  if (typeof saveBtn !== "undefined") {
+    saveBtn.disabled = lockedByOther;
+  }
+
+  const timerIconEl = document.getElementById("timer-icon");
+  const scheduleIconEl = document.getElementById("schedule-icon");
+  const automationSwitchWrap = document.getElementById("automation-switch-wrap");
+  if (timerIconEl) timerIconEl.classList.toggle("active", timerActive);
+  if (automationSwitchWrap) automationSwitchWrap.classList.toggle("locked", lockedByOther);
+  if (typeof saveBtn !== "undefined") saveBtn.classList.toggle("locked", lockedByOther);
+  if (typeof onSelect !== "undefined") onSelect.disabled = lockedByOther;
+  if (typeof offSelect !== "undefined") offSelect.disabled = lockedByOther;
+
+  if (lockedByOther) {
+    // Solange ein Timer oder eine Sequenz läuft, hat der Schalter keine
+    // Funktion - nur Info-Anzeige, nichts zu klicken.
     automationStatusBadge.classList.add("pending");
-    automationStatusText.textContent = "Reaktiviert sich nach Timer von selbst";
-    automationSub.textContent = "Timer läuft – Automatik kommt danach automatisch zurück";
+    if (scheduleIconEl) { scheduleIconEl.classList.remove("active"); scheduleIconEl.classList.add("locked"); }
+    if (sequenceActive) {
+      automationStatusText.textContent = "Sequenz aktiv – Automatik gesperrt";
+      automationSub.textContent = "Sequenz läuft – Schalter ist bis Sequenz-Ende gesperrt";
+    } else if (willReactivate) {
+      automationStatusText.textContent = "Reaktiviert sich nach Timer von selbst";
+      automationSub.textContent = "Timer läuft – Automatik kommt danach automatisch zurück";
+    } else {
+      automationStatusText.textContent = "Timer aktiv – Automatik gesperrt";
+      automationSub.textContent = "Timer läuft – Schalter ist bis Timer-Ende gesperrt";
+    }
   } else if (!lastAutomationConfigured) {
     automationStatusBadge.classList.add("paused");
+    if (scheduleIconEl) scheduleIconEl.classList.remove("active", "locked");
     automationStatusText.textContent = "Kein Zeitplan gespeichert";
     automationSub.textContent = "noch kein Zeitplan gespeichert – bitte unten einmal speichern";
   } else if (lastAutomationEnabled) {
     automationStatusBadge.classList.add("active");
+    if (scheduleIconEl) { scheduleIconEl.classList.add("active"); scheduleIconEl.classList.remove("locked"); }
     automationStatusText.textContent = "Automatik aktiv";
     automationSub.textContent = "Zeitplan schaltet die Lüfter stündlich automatisch";
   } else {
     automationStatusBadge.classList.add("paused");
+    if (scheduleIconEl) scheduleIconEl.classList.remove("active", "locked");
     automationStatusText.textContent = "Pausiert – klicken zum Aktivieren";
     automationSub.textContent = "pausiert – manuelle Einstellung ist aktiv";
   }
@@ -489,6 +672,7 @@ masterToggle.addEventListener("change", async () => {
   suppressAutomationPoll = true;
   masterToggle.disabled = true;
   const state = masterToggle.checked;
+  let ok = false;
   try {
     const res = await fetch("/api/all", {
       method: "POST",
@@ -498,8 +682,7 @@ masterToggle.addEventListener("change", async () => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     PINS.forEach(({ pin }) => updateFanUI(pin, data.state));
-    updateAutomationUI(false);
-    fetchTimerStatus(); // alle laufenden Timer wurden serverseitig abgebrochen
+    ok = true;
   } catch (e) {
     setConn(false, "Schaltvorgang fehlgeschlagen");
     masterToggle.checked = !state;
@@ -507,6 +690,10 @@ masterToggle.addEventListener("change", async () => {
     masterToggle.disabled = false;
     suppressStatusPoll = false;
     suppressAutomationPoll = false;
+  }
+  if (ok) {
+    fetchAutomation(); // Zeitplan bleibt i.d.R. aktiv, nur die Lüfter wurden temporär ausgenommen
+    fetchTimerStatus();
   }
 });
 
@@ -605,11 +792,62 @@ saveBtn.addEventListener("click", async () => {
   }
 });
 
+// ---- Laufzeit (kompakte Anzeige) ----
+const runtimeItemsEl = document.getElementById("runtime-items");
+const RUNTIME_LABELS = { "17": "L1", "27": "L2", "22": "L3", "23": "L4" };
+const RUNTIME_PINS = ["17", "27", "22", "23"];
+
+RUNTIME_PINS.forEach((pin) => {
+  const item = document.createElement("span");
+  item.className = "runtime-item";
+  item.innerHTML = `
+    <span class="rt-label">${RUNTIME_LABELS[pin]}</span>
+    <span class="rt-value" data-runtime-pin="${pin}">–</span>
+    <button type="button" class="runtime-reset-btn" data-runtime-reset="${pin}" title="Laufzeit zurücksetzen">↺</button>
+  `;
+  runtimeItemsEl.appendChild(item);
+});
+
+async function fetchRuntime() {
+  try {
+    const res = await fetch("/api/runtime");
+    const data = await res.json();
+    Object.entries(data.hours || {}).forEach(([pin, hours]) => {
+      const el = runtimeItemsEl.querySelector(`[data-runtime-pin="${pin}"]`);
+      if (el) el.textContent = `${hours}h`;
+    });
+  } catch (e) {
+    // nächster Poll versucht es erneut
+  }
+}
+
+runtimeItemsEl.addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-runtime-reset]");
+  if (!btn) return;
+  const pin = btn.dataset.runtimeReset;
+  if (!confirm(`Laufzeit für ${RUNTIME_LABELS[pin]} wirklich auf 0 zurücksetzen?`)) return;
+  try {
+    const res = await fetch("/api/runtime/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pin }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Fehler");
+    Object.entries(data.hours || {}).forEach(([p, hours]) => {
+      const el = runtimeItemsEl.querySelector(`[data-runtime-pin="${p}"]`);
+      if (el) el.textContent = `${hours}h`;
+    });
+  } catch (e) {
+    setConn(false, "Laufzeit-Reset fehlgeschlagen");
+  }
+});
+
 // ---- Timer (eigener Bereich unter den Lüftern) ----
 const TARGETS = [
   { scope: "master", label: "Alle Lüfter" },
 ];
-const PRESET_MINUTES = [5, 15, 30, 60];
+const PRESET_MINUTES = [1, 5, 15, 30, 60];
 
 const timerRowsEl = document.getElementById("timer-rows");
 let localTimers = {}; // scope -> { remaining_seconds, duration_minutes }
@@ -671,9 +909,15 @@ function tickLocalTimers() {
   });
 
   if (!stillRunning) {
-    fetchTimerStatus();
-    fetchStatus();
-    fetchAutomation();
+    // Feste Reihenfolge statt gleichzeitiger Anfragen: erst den echten
+    // Automatik-Status ganz abwarten, DANN erst die Timer-Liste
+    // aktualisieren (die das Badge neu berechnet). So kann nie kurz ein
+    // veralteter Zwischenstand angezeigt werden.
+    (async () => {
+      await fetchAutomation();
+      await fetchTimerStatus();
+      fetchStatus();
+    })();
   }
 }
 
@@ -723,15 +967,233 @@ timerRowsEl.addEventListener("click", (e) => {
   }
 });
 
+// ---- Sequenzen ----
+const sequenceListEl = document.getElementById("sequence-list");
+const sequenceNewBtn = document.getElementById("sequence-new-btn");
+const sequenceBuilderEl = document.getElementById("sequence-builder");
+const sequenceNameInput = document.getElementById("sequence-name-input");
+const sequenceStepsContainer = document.getElementById("sequence-steps-container");
+const sequenceAddStepBtn = document.getElementById("sequence-add-step-btn");
+const sequenceLoopCheckbox = document.getElementById("sequence-loop-checkbox");
+const sequenceSaveBtn = document.getElementById("sequence-save-btn");
+const sequenceCancelBtn = document.getElementById("sequence-cancel-btn");
+const sequenceMsg = document.getElementById("sequence-msg");
+
+const SEQ_PIN_LABELS = { "17": "L1", "27": "L2", "22": "L3", "23": "L4" };
+
+let sequencesCache = {};
+let runningSequenceInfo = null;
+
+function addSequenceStepRow() {
+  const row = document.createElement("div");
+  row.className = "sequence-step-row";
+  const pinLabels = Object.entries(SEQ_PIN_LABELS).map(([pin, label]) => `
+    <label><input type="checkbox" value="${pin}"> ${label}</label>
+  `).join("");
+  row.innerHTML = `
+    <div class="sequence-step-pins">${pinLabels}</div>
+    <input type="number" class="sequence-step-duration" min="0.1" step="0.5" placeholder="Min">
+    <button type="button" class="runtime-reset-btn" data-remove-step title="Schritt entfernen">✕</button>
+  `;
+  row.querySelector("[data-remove-step]").addEventListener("click", () => row.remove());
+  sequenceStepsContainer.appendChild(row);
+}
+
+function openSequenceBuilder() {
+  sequenceNameInput.value = "";
+  sequenceStepsContainer.innerHTML = "";
+  sequenceLoopCheckbox.checked = false;
+  sequenceMsg.textContent = "";
+  addSequenceStepRow();
+  sequenceBuilderEl.style.display = "block";
+  sequenceNewBtn.style.display = "none";
+}
+
+function closeSequenceBuilder() {
+  sequenceBuilderEl.style.display = "none";
+  sequenceNewBtn.style.display = "inline-block";
+}
+
+sequenceNewBtn.addEventListener("click", openSequenceBuilder);
+sequenceCancelBtn.addEventListener("click", closeSequenceBuilder);
+sequenceAddStepBtn.addEventListener("click", addSequenceStepRow);
+
+sequenceSaveBtn.addEventListener("click", async () => {
+  const name = sequenceNameInput.value.trim();
+  if (!name) {
+    sequenceMsg.textContent = "Bitte einen Namen eingeben";
+    sequenceMsg.className = "save-msg err";
+    return;
+  }
+
+  const steps = [];
+  for (const row of sequenceStepsContainer.querySelectorAll(".sequence-step-row")) {
+    const pins = Array.from(row.querySelectorAll('input[type="checkbox"]:checked')).map((cb) => cb.value);
+    const duration = parseFloat(row.querySelector(".sequence-step-duration").value);
+    if (pins.length === 0 || !duration || duration <= 0) {
+      sequenceMsg.textContent = "Jeder Schritt braucht Lüfter + gültige Dauer";
+      sequenceMsg.className = "save-msg err";
+      return;
+    }
+    steps.push({ pins, duration_minutes: duration });
+  }
+  if (steps.length === 0) {
+    sequenceMsg.textContent = "Mindestens ein Schritt nötig";
+    sequenceMsg.className = "save-msg err";
+    return;
+  }
+
+  sequenceSaveBtn.disabled = true;
+  try {
+    const res = await fetch("/api/sequences", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, steps, loop: sequenceLoopCheckbox.checked }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Fehler");
+    closeSequenceBuilder();
+    await fetchSequences();
+  } catch (e) {
+    sequenceMsg.textContent = "Fehler: " + e.message;
+    sequenceMsg.className = "save-msg err";
+  } finally {
+    sequenceSaveBtn.disabled = false;
+  }
+});
+
+function formatSeqSummary(seq) {
+  const stepText = seq.steps
+    .map((s) => `${s.pins.map((p) => SEQ_PIN_LABELS[p]).join("+")} ${s.duration_minutes}min`)
+    .join(" → ");
+  return seq.loop ? `${stepText} · Loop` : stepText;
+}
+
+function renderSequenceList() {
+  const ids = Object.keys(sequencesCache);
+  if (ids.length === 0) {
+    sequenceListEl.innerHTML = '<div class="sequence-empty-hint">Noch keine Sequenz angelegt.</div>';
+    return;
+  }
+  sequenceListEl.innerHTML = "";
+  ids.forEach((id) => {
+    const seq = sequencesCache[id];
+    const isRunning = runningSequenceInfo && runningSequenceInfo.id === id;
+    const item = document.createElement("div");
+    item.className = "sequence-item";
+    item.dataset.id = id;
+    item.innerHTML = `
+      <div class="sequence-item-info">
+        <strong>${seq.name}</strong>
+        <span class="sub">${formatSeqSummary(seq)}</span>
+      </div>
+      <div class="sequence-item-actions">
+        ${isRunning ? `<span class="sequence-countdown" data-seq-countdown="${id}">…</span>` : ""}
+        <button type="button" class="timer-btn ${isRunning ? "running" : ""}" data-seq-toggle="${id}">
+          ${isRunning ? "Stop" : "Start"}
+        </button>
+        <button type="button" class="runtime-reset-btn" data-seq-delete="${id}" title="Löschen">🗑</button>
+      </div>
+    `;
+    sequenceListEl.appendChild(item);
+  });
+}
+
+async function fetchSequences() {
+  try {
+    const res = await fetch("/api/sequences");
+    const data = await res.json();
+    sequencesCache = data.sequences || {};
+    renderSequenceList();
+  } catch (e) {
+    // naechster Poll versucht es erneut
+  }
+}
+
+async function fetchSequenceStatus() {
+  try {
+    const res = await fetch("/api/sequences/status");
+    const data = await res.json();
+    runningSequenceInfo = data.running || null;
+    renderSequenceList();
+    renderAutomationBadge();
+    if (runningSequenceInfo) {
+      const el = sequenceListEl.querySelector(`[data-seq-countdown="${runningSequenceInfo.id}"]`);
+      if (el && runningSequenceInfo.remaining_seconds !== null) {
+        const m = Math.floor(runningSequenceInfo.remaining_seconds / 60);
+        const s = runningSequenceInfo.remaining_seconds % 60;
+        el.textContent = `Schritt ${runningSequenceInfo.current_step_index + 1}/${runningSequenceInfo.total_steps} · ${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+      }
+    }
+  } catch (e) {
+    // naechster Poll versucht es erneut
+  }
+}
+
+sequenceListEl.addEventListener("click", async (e) => {
+  const startBtn = e.target.closest("[data-seq-toggle]");
+  if (startBtn) {
+    const id = startBtn.dataset.seqToggle;
+    startBtn.disabled = true;
+    try {
+      if (runningSequenceInfo && runningSequenceInfo.id === id) {
+        await fetch("/api/sequences/stop", { method: "POST" });
+      } else {
+        const res = await fetch(`/api/sequences/${id}/start`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Fehler");
+      }
+      await fetchSequenceStatus();
+      fetchStatus();
+      fetchAutomation();
+      fetchTimerStatus();
+    } catch (e) {
+      setConn(false, "Sequenz-Aktion fehlgeschlagen");
+    } finally {
+      startBtn.disabled = false;
+    }
+    return;
+  }
+
+  const deleteBtn = e.target.closest("[data-seq-delete]");
+  if (deleteBtn) {
+    const id = deleteBtn.dataset.seqDelete;
+    const name = sequencesCache[id] ? sequencesCache[id].name : "diese Sequenz";
+    if (!confirm(`"${name}" wirklich löschen?`)) return;
+    try {
+      await fetch(`/api/sequences/${id}`, { method: "DELETE" });
+      await fetchSequences();
+      await fetchSequenceStatus();
+    } catch (e) {
+      setConn(false, "Löschen fehlgeschlagen");
+    }
+  }
+});
+
 // Init
 fetchStatus();
 fetchSchedule();
-fetchAutomation();
-fetchTimerStatus();
+fetchRuntime();
+fetchSequences();
+(async () => {
+  await fetchAutomation();
+  await fetchTimerStatus();
+  await fetchSequenceStatus();
+})();
+
+async function pollAutomationAndTimers() {
+  // Feste Reihenfolge: Automatik-Status immer zuerst fertig laden,
+  // erst danach die Timer-Liste aktualisieren (die das Badge neu
+  // berechnet) - verhindert kurzes Umspringen auf einen veralteten Stand.
+  await fetchAutomation();
+  await fetchTimerStatus();
+}
+
 setInterval(fetchStatus, 4000);
-setInterval(fetchAutomation, 4000);
-setInterval(fetchTimerStatus, 4000);
+setInterval(pollAutomationAndTimers, 4000);
 setInterval(tickLocalTimers, 1000);
+setInterval(fetchRuntime, 30000); // ändert sich nur langsam, reicht alle 30s
+setInterval(fetchSequenceStatus, 2000); // für einen flüssigen Countdown
 </script>
 </body>
 </html>

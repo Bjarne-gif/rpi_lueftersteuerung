@@ -35,9 +35,10 @@ Eine Dokumentation zur Verkabelung für den RPI4b und RPI5 werden bald hier hinz
 ## GUI 
 
 <img width="1020" height="1171" alt="luft" src="https://github.com/user-attachments/assets/df777c94-aba7-474d-b86b-e14f3edb0729" />
+<img width="1097" height="289" alt="image" src="https://github.com/user-attachments/assets/7783d664-884c-47ee-a436-e015139c848f" />
 
 <img width="1010" height="1176" alt="image" src="https://github.com/user-attachments/assets/0565b0de-a6fe-4fd9-bbde-11df4600dca0" />
-<img width="1097" height="289" alt="image" src="https://github.com/user-attachments/assets/7783d664-884c-47ee-a436-e015139c848f" />
+
 
 
 

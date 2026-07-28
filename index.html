@@ -202,7 +202,7 @@
   .fan-state-label { font-size: 12px; color: var(--muted); min-height: 16px; }
 
   /* ---- Schedule card ---- */
-  .schedule-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 24px; }
+  .schedule-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 24px; margin-bottom: 22px; }
   .schedule-card h2 { margin: 0; font-size: 18px; }
   .schedule-card p.hint { margin: 0 0 20px; color: var(--muted); font-size: 13px; }
 
@@ -273,19 +273,28 @@
 
   /* ---- Sequenz-Karte ---- */
   .sequence-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 24px; margin-bottom: 22px; }
-  .sequence-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); flex-wrap: wrap; }
-  .sequence-item:first-of-type { border-top: none; }
-  .sequence-item-info strong { font-size: 14px; }
-  .sequence-item-info .sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .sequence-item-actions { display: flex; align-items: center; gap: 10px; }
+  .sequence-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 16px; margin-bottom: 10px; flex-wrap: nowrap;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .sequence-item.running { border-color: rgba(51,230,176,0.5); box-shadow: 0 0 0 1px rgba(51,230,176,0.15); }
+  .sequence-item-info { flex: 1 1 auto; min-width: 0; }
+  .sequence-item-info strong { display: block; }
+  .sequence-item-info .sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: break-word; }
+  .sequence-item-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .sequence-countdown { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); font-size: 13px; white-space: nowrap; }
   .sequence-empty-hint { color: var(--muted); font-size: 13px; padding: 8px 0; }
 
   .sequence-step-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
   .sequence-step-pins { display: flex; gap: 10px; font-size: 12px; color: var(--muted); }
   .sequence-step-pins label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .sequence-step-pins input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
   .sequence-step-duration { width: 64px; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 8px; font-size: 13px; }
+  .sequence-step-duration:focus { border-color: var(--accent); outline: none; }
   .sequence-loop-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); margin: 10px 0; }
+  .sequence-loop-row input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
   .sequence-name-input { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 10px; font-size: 14px; width: 100%; max-width: 260px; outline: none; }
   .sequence-name-input:focus { border-color: var(--accent); }
 
@@ -983,40 +992,51 @@ const SEQ_PIN_LABELS = { "17": "L1", "27": "L2", "22": "L3", "23": "L4" };
 
 let sequencesCache = {};
 let runningSequenceInfo = null;
+let lastRenderedRunningSeqId = undefined; // verhindert unnötigen DOM-Neuaufbau alle 2s (Blink-Bug)
+let editingSequenceId = null; // gesetzt, während eine bestehende Sequenz bearbeitet wird
 
-function addSequenceStepRow() {
+function addSequenceStepRow(prefill) {
+  const hasPrefill = prefill && Array.isArray(prefill.pins);
   const row = document.createElement("div");
   row.className = "sequence-step-row";
-  const pinLabels = Object.entries(SEQ_PIN_LABELS).map(([pin, label]) => `
-    <label><input type="checkbox" value="${pin}"> ${label}</label>
-  `).join("");
+  const pinLabels = Object.entries(SEQ_PIN_LABELS).map(([pin, label]) => {
+    const checked = hasPrefill && prefill.pins.includes(pin) ? "checked" : "";
+    return `<label><input type="checkbox" value="${pin}" ${checked}> ${label}</label>`;
+  }).join("");
   row.innerHTML = `
     <div class="sequence-step-pins">${pinLabels}</div>
-    <input type="number" class="sequence-step-duration" min="0.1" step="0.5" placeholder="Min">
+    <input type="number" class="sequence-step-duration" min="0.1" step="0.5" placeholder="Min" value="${hasPrefill ? prefill.duration_minutes : ""}">
     <button type="button" class="runtime-reset-btn" data-remove-step title="Schritt entfernen">✕</button>
   `;
   row.querySelector("[data-remove-step]").addEventListener("click", () => row.remove());
   sequenceStepsContainer.appendChild(row);
 }
 
-function openSequenceBuilder() {
-  sequenceNameInput.value = "";
+function openSequenceBuilder(existingSeq) {
+  editingSequenceId = existingSeq ? existingSeq.id : null;
+  sequenceNameInput.value = existingSeq ? existingSeq.name : "";
   sequenceStepsContainer.innerHTML = "";
-  sequenceLoopCheckbox.checked = false;
+  sequenceLoopCheckbox.checked = existingSeq ? !!existingSeq.loop : false;
   sequenceMsg.textContent = "";
-  addSequenceStepRow();
+  sequenceSaveBtn.textContent = existingSeq ? "Änderungen speichern" : "Speichern";
+  if (existingSeq) {
+    existingSeq.steps.forEach((step) => addSequenceStepRow(step));
+  } else {
+    addSequenceStepRow();
+  }
   sequenceBuilderEl.style.display = "block";
   sequenceNewBtn.style.display = "none";
 }
 
 function closeSequenceBuilder() {
+  editingSequenceId = null;
   sequenceBuilderEl.style.display = "none";
   sequenceNewBtn.style.display = "inline-block";
 }
 
-sequenceNewBtn.addEventListener("click", openSequenceBuilder);
+sequenceNewBtn.addEventListener("click", () => openSequenceBuilder());
 sequenceCancelBtn.addEventListener("click", closeSequenceBuilder);
-sequenceAddStepBtn.addEventListener("click", addSequenceStepRow);
+sequenceAddStepBtn.addEventListener("click", () => addSequenceStepRow());
 
 sequenceSaveBtn.addEventListener("click", async () => {
   const name = sequenceNameInput.value.trim();
@@ -1048,7 +1068,12 @@ sequenceSaveBtn.addEventListener("click", async () => {
     const res = await fetch("/api/sequences", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, steps, loop: sequenceLoopCheckbox.checked }),
+      body: JSON.stringify({
+        id: editingSequenceId || undefined,
+        name,
+        steps,
+        loop: sequenceLoopCheckbox.checked,
+      }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Fehler");
@@ -1080,7 +1105,7 @@ function renderSequenceList() {
     const seq = sequencesCache[id];
     const isRunning = runningSequenceInfo && runningSequenceInfo.id === id;
     const item = document.createElement("div");
-    item.className = "sequence-item";
+    item.className = "sequence-item" + (isRunning ? " running" : "");
     item.dataset.id = id;
     item.innerHTML = `
       <div class="sequence-item-info">
@@ -1092,6 +1117,7 @@ function renderSequenceList() {
         <button type="button" class="timer-btn ${isRunning ? "running" : ""}" data-seq-toggle="${id}">
           ${isRunning ? "Stop" : "Start"}
         </button>
+        <button type="button" class="runtime-reset-btn" data-seq-edit="${id}" title="Bearbeiten">✎</button>
         <button type="button" class="runtime-reset-btn" data-seq-delete="${id}" title="Löschen">🗑</button>
       </div>
     `;
@@ -1115,8 +1141,16 @@ async function fetchSequenceStatus() {
     const res = await fetch("/api/sequences/status");
     const data = await res.json();
     runningSequenceInfo = data.running || null;
-    renderSequenceList();
+    const currentRunningId = runningSequenceInfo ? runningSequenceInfo.id : null;
+
+    if (currentRunningId !== lastRenderedRunningSeqId) {
+      // Es hat sich wirklich etwas geändert (andere/keine Sequenz läuft
+      // jetzt) - erst dann die Liste komplett neu aufbauen.
+      lastRenderedRunningSeqId = currentRunningId;
+      renderSequenceList();
+    }
     renderAutomationBadge();
+
     if (runningSequenceInfo) {
       const el = sequenceListEl.querySelector(`[data-seq-countdown="${runningSequenceInfo.id}"]`);
       if (el && runningSequenceInfo.remaining_seconds !== null) {
@@ -1152,6 +1186,14 @@ sequenceListEl.addEventListener("click", async (e) => {
     } finally {
       startBtn.disabled = false;
     }
+    return;
+  }
+
+  const editBtn = e.target.closest("[data-seq-edit]");
+  if (editBtn) {
+    const id = editBtn.dataset.seqEdit;
+    const seq = sequencesCache[id];
+    if (seq) openSequenceBuilder(seq);
     return;
   }
 

@@ -844,7 +844,10 @@ def _timer_expired(scope):
 
 def stop_running_sequence():
     """Bricht eine ggf. laufende Sequenz ab und stellt den Zustand von
-    davor wieder her (gleiche Logik wie beim Timer)."""
+    davor wieder her (gleiche Logik wie beim Timer). Hält die Sperre für
+    die GESAMTE Dauer (inkl. Revert), damit der Hintergrund-Thread der
+    Sequenz nicht währenddessen noch einen eigenen Schreibvorgang
+    durchdrücken kann (Race Condition)."""
     global running_sequence
     with sequence_lock:
         info = running_sequence
@@ -852,17 +855,18 @@ def stop_running_sequence():
             return
         info["stop_event"].set()
         running_sequence = None
-    _revert_to_previous({
-        "pins": info["participating_pins"],
-        "pre_existing_exclusions": info["pre_existing_exclusions"],
-    })
+        _revert_to_previous({
+            "pins": info["participating_pins"],
+            "pre_existing_exclusions": info["pre_existing_exclusions"],
+        })
 
 
 def _run_sequence(seq_id, stop_event, steps, loop, participating_pins):
     """Läuft in einem eigenen Hintergrund-Thread: arbeitet die Schritte
-    der Reihe nach ab (optional als Endlos-Schleife). Ein externer Stop
-    (stop_event) übernimmt selbst das Aufräumen/Wiederherstellen - der
-    Thread hier beendet sich dann einfach nur still."""
+    der Reihe nach ab (optional als Endlos-Schleife). Prüfung UND
+    Pin-Schreibvorgang passieren als Einheit innerhalb derselben Sperre
+    wie ein externer Stop - dadurch ist ausgeschlossen, dass hier noch
+    etwas geschrieben wird, nachdem/während von außen gestoppt wurde."""
     global running_sequence
     while True:
         for idx, step in enumerate(steps):
@@ -873,13 +877,12 @@ def _run_sequence(seq_id, stop_event, steps, loop, participating_pins):
                 running_sequence["step_end_time"] = (
                     datetime.datetime.now() + datetime.timedelta(minutes=step["duration_minutes"])
                 )
-
-            step_pins = step["pins"]
-            off_pins = [p for p in participating_pins if p not in step_pins]
-            if step_pins:
-                apply_pin_values(step_pins, True)
-            if off_pins:
-                apply_pin_values(off_pins, False)
+                step_pins = step["pins"]
+                off_pins = [p for p in participating_pins if p not in step_pins]
+                if step_pins:
+                    apply_pin_values(step_pins, True)
+                if off_pins:
+                    apply_pin_values(off_pins, False)
 
             remaining = step["duration_minutes"] * 60
             while remaining > 0:
@@ -890,16 +893,16 @@ def _run_sequence(seq_id, stop_event, steps, loop, participating_pins):
         if not loop:
             break
 
-    # Sequenz ist von selbst (ohne Loop) zu Ende -> hier selbst aufräumen
+    # Sequenz ist von selbst (ohne Loop) zu Ende -> hier selbst aufräumen,
+    # ebenfalls unter derselben Sperre (gleicher Grund wie oben).
     with sequence_lock:
         info = running_sequence
         if info and info.get("id") == seq_id:
             running_sequence = None
-    if info:
-        _revert_to_previous({
-            "pins": info["participating_pins"],
-            "pre_existing_exclusions": info["pre_existing_exclusions"],
-        })
+            _revert_to_previous({
+                "pins": info["participating_pins"],
+                "pre_existing_exclusions": info["pre_existing_exclusions"],
+            })
 
 
 @app.route("/api/timer/start", methods=["POST"])
@@ -1117,7 +1120,11 @@ def start_sequence(seq_id):
 
     steps = seq["steps"]
     loop = seq.get("loop", False)
-    participating_pins = sorted(set(p for step in steps for p in step["pins"]))
+    # Die Sequenz kontrolliert IMMER alle 4 Pins (wie der Master-Timer),
+    # nicht nur die in den Schritten genannten - jeder Schritt schaltet
+    # so konsequent alle anderen Lüfter aus, statt sie unangetastet zu
+    # lassen (überschreibt damit auch manuell gesetzte Zustände).
+    participating_pins = list(PIN_ORDER)
 
     # Timer und Sequenz schließen sich gegenseitig aus.
     cancel_all_timers()

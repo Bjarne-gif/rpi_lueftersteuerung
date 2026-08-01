@@ -6,18 +6,129 @@
 <title>Lüftersteuerung Rack</title>
 <style>
   :root {
+    /* Hintergrund & Panels */
     --bg: #0b0f14;
     --panel: #121821;
     --panel-2: #161d28;
     --border: #232c3a;
     --text: #e7edf5;
     --muted: #7c8ba1;
+
+    /* Akzentfarbe (variiert je Theme) */
     --accent: #33e6b0;
+    --accent-dark: #1fae86;
+    --accent-rgb: 51, 230, 176;
     --accent-glow: rgba(51, 230, 176, 0.45);
+    --accent-text: #04140f;
+
+    /* Hintergrund-Verlaufsfarben */
+    --bg-grad-1: #142031;
+    --bg-grad-2: #1a1230;
+
+    /* Schalter */
+    --switch-off: #263042;
+    --switch-thumb: #cfd8e3;
+
+    /* Fehlermeldung */
     --danger: #ff5470;
     --danger-glow: rgba(255, 84, 112, 0.4);
+
+    /* Warnfarbe (pausiert / Ausnahme) – MUSS sich vom Akzent abheben */
     --warn: #ffb454;
+    --warn-dark: #b8791f;
+    --warn-rgb: 255, 180, 84;
+    --warn-text: #ffd9a0;
     --warn-glow: rgba(255, 180, 84, 0.4);
+
+    /* Timer-/Sperr-Farbe (MUSS sich von Akzent und Warn abheben) */
+    --locked: #8fb8ff;
+    --locked-dark: #4a7fd6;
+    --locked-rgb: 143, 184, 255;
+  }
+
+  /* ═══ THEMES ════════════════════════════════════════════════════════════ */
+
+  /* ── Neon (Lila/Violett) ── */
+:root[data-theme="neon"] {
+    --bg: #0d0a14; --panel: #15102b; --panel-2: #1a1435; --border: #2d2450;
+    --text: #e9e4f7; --muted: #8878b8;
+    --accent: #b87fff; --accent-dark: #8855dd; --accent-rgb: 184, 127, 255;
+    --accent-glow: rgba(184, 127, 255, 0.45); --accent-text: #0d0520;
+    --bg-grad-1: #1e0f42; --bg-grad-2: #0d0920;
+    --switch-off: #2a1f4a; --switch-thumb: #c5b8e8;
+    /* Locked bleibt Blau – kein Konflikt mit Lila-Akzent */
+  }
+
+  /* ── Rose (Pink/Magenta) – Warn bleibt Orange, kein Konflikt ── */
+:root[data-theme="rose"] {
+    --bg: #120a0e; --panel: #1f1018; --panel-2: #261420; --border: #3a1e2e;
+    --text: #f7e4ed; --muted: #b87898;
+    --accent: #ff2d7a; --accent-dark: #cc0055; --accent-rgb: 255, 45, 122;
+    --accent-glow: rgba(255, 45, 122, 0.45); --accent-text: #1a0010;
+    --bg-grad-1: #2a0a1a; --bg-grad-2: #1a0820;
+    --switch-off: #2e1020; --switch-thumb: #e8b8cc;
+    /* Warn auf warmes Gelb verschoben – distanziert von Rosa-Akzent */
+    --warn: #ffcc44; --warn-dark: #aa8800;
+    --warn-rgb: 255, 204, 68; --warn-text: #ffe090; --warn-glow: rgba(255, 204, 68, 0.4);
+  }
+
+  /* ── Arktis (Cyan) – Locked-Farbe auf Lila gesetzt, kein Konflikt mit Cyan ── */
+:root[data-theme="arktis"] {
+    --bg: #070f10; --panel: #0d1a1c; --panel-2: #102022; --border: #16303a;
+    --text: #d5eef0; --muted: #568890;
+    --accent: #00d8e8; --accent-dark: #009aaa; --accent-rgb: 0, 216, 232;
+    --accent-glow: rgba(0, 216, 232, 0.45); --accent-text: #001c20;
+    --bg-grad-1: #061820; --bg-grad-2: #070c18;
+    --switch-off: #0c2228; --switch-thumb: #a0d0d8;
+    /* Locked Blau würde mit Cyan-Akzent konkurrieren → auf Lila umgestellt */
+    --locked: #c07fff; --locked-dark: #8844cc; --locked-rgb: 192, 127, 255;
+  }
+
+  /* ── Hell (Grün, kühles Weiß) ── */
+:root[data-theme="hell"] {
+    --bg: #eef2f7; --panel: #ffffff; --panel-2: #f4f7fb; --border: #d4dce8;
+    --text: #1a2332; --muted: #6b7a8d;
+    --accent: #0ea868; --accent-dark: #097a4a; --accent-rgb: 14, 168, 104;
+    --accent-glow: rgba(14, 168, 104, 0.3); --accent-text: #ffffff;
+    --bg-grad-1: #c8dff5; --bg-grad-2: #dccff5;
+    --switch-off: #c8d4e0; --switch-thumb: #7a8fa5;
+    --danger: #c82040; --danger-glow: rgba(200, 32, 64, 0.3);
+    --warn: #b86800; --warn-dark: #804400; --warn-rgb: 184, 104, 0;
+    --warn-text: #9a4a00; --warn-glow: rgba(184, 104, 0, 0.3);
+    /* Locked auf kräftigeres Blau – lesbar auf hellem Hintergrund */
+    --locked: #3a6fd8; --locked-dark: #2050b0; --locked-rgb: 58, 111, 216;
+  }
+
+  /* ── Sakura (Pink, warmes Weiß) ── */
+:root[data-theme="sakura"] {
+    --bg: #fdf0f4; --panel: #ffffff; --panel-2: #fdf5f8; --border: #edd5de;
+    --text: #1f0d16; --muted: #9a6878;
+    --accent: #d44070; --accent-dark: #aa2050; --accent-rgb: 212, 64, 112;
+    --accent-glow: rgba(212, 64, 112, 0.3); --accent-text: #ffffff;
+    --bg-grad-1: #f5d5e5; --bg-grad-2: #e5d0f5;
+    --switch-off: #e0c0cc; --switch-thumb: #a07080;
+    --danger: #a01010; --danger-glow: rgba(160, 16, 16, 0.3);
+    /* Warn auf Amber – klar von Rosa getrennt */
+    --warn: #c07000; --warn-dark: #804400; --warn-rgb: 192, 112, 0;
+    --warn-text: #984800; --warn-glow: rgba(192, 112, 0, 0.3);
+    /* Locked auf Indigo – klar von Rosa und Amber getrennt */
+    --locked: #5060d0; --locked-dark: #3040a8; --locked-rgb: 80, 96, 208;
+  }
+
+  /* ── Wald (Waldgrün, kühles Hellgrau) ── */
+:root[data-theme="wald"] {
+    --bg: #eff4ef; --panel: #ffffff; --panel-2: #f2f7f2; --border: #c8d8c5;
+    --text: #0d180d; --muted: #5a7858;
+    --accent: #1a7a3a; --accent-dark: #0e5225; --accent-rgb: 26, 122, 58;
+    --accent-glow: rgba(26, 122, 58, 0.3); --accent-text: #ffffff;
+    --bg-grad-1: #c5e0c5; --bg-grad-2: #ccd5f0;
+    --switch-off: #bcd0b8; --switch-thumb: #688a65;
+    --danger: #b01010; --danger-glow: rgba(176, 16, 16, 0.3);
+    /* Warn auf Bernstein – klar von Dunkelgrün getrennt */
+    --warn: #b06000; --warn-dark: #7a3a00; --warn-rgb: 176, 96, 0;
+    --warn-text: #8a4400; --warn-glow: rgba(176, 96, 0, 0.3);
+    /* Locked auf kräftiges Blau – klar von Grün getrennt */
+    --locked: #3860c8; --locked-dark: #2040a0; --locked-rgb: 56, 96, 200;
   }
 
   * { box-sizing: border-box; }
@@ -26,8 +137,8 @@
     margin: 0;
     min-height: 100vh;
     background:
-      radial-gradient(circle at 15% 0%, #142031 0%, transparent 45%),
-      radial-gradient(circle at 85% 100%, #1a1230 0%, transparent 45%),
+      radial-gradient(circle at 15% 0%, var(--bg-grad-1) 0%, transparent 45%),
+      radial-gradient(circle at 85% 100%, var(--bg-grad-2) 0%, transparent 45%),
       var(--bg);
     color: var(--text);
     font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -87,20 +198,20 @@
     background: var(--muted); flex-shrink: 0; transition: background .2s, box-shadow .2s;
   }
   .automation-status-badge.active {
-    color: var(--accent); border-color: rgba(51,230,176,0.35); background: rgba(51,230,176,0.08);
+    color: var(--accent); border-color: rgba(var(--accent-rgb), 0.35); background: rgba(var(--accent-rgb), 0.08);
   }
   .automation-status-badge.active .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); }
   .automation-status-badge.paused {
-    color: #ffd9a0; border-color: rgba(255,180,84,0.4); background: rgba(255,180,84,0.08);
+    color: var(--warn-text); border-color: rgba(var(--warn-rgb), 0.4); background: rgba(var(--warn-rgb), 0.08);
     cursor: pointer;
   }
-  .automation-status-badge.paused:hover { background: rgba(255,180,84,0.16); }
+  .automation-status-badge.paused:hover { background: rgba(var(--warn-rgb), 0.16); }
   .automation-status-badge.paused .dot { background: var(--warn); box-shadow: 0 0 8px var(--warn-glow); }
   .automation-status-badge.pending {
-    color: #8fb8ff; border-color: rgba(143,184,255,0.35); background: rgba(143,184,255,0.08);
+    color: var(--locked); border-color: rgba(var(--locked-rgb), 0.35); background: rgba(var(--locked-rgb), 0.08);
     cursor: default;
   }
-  .automation-status-badge.pending .dot { background: #8fb8ff; box-shadow: 0 0 8px rgba(143,184,255,0.5); }
+  .automation-status-badge.pending .dot { background: var(--locked); box-shadow: 0 0 8px rgba(var(--locked-rgb), 0.5); }
 
   /* ---- Master card ---- */
   .master-card {
@@ -110,7 +221,7 @@
     padding: 22px 26px;
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 22px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    box-shadow: none;
   }
   .master-card .label { display: flex; align-items: center; gap: 14px; }
   .master-card .label .fan-icon { width: 34px; height: 34px; color: var(--accent); }
@@ -140,7 +251,7 @@
     position: relative; overflow: hidden;
     transition: border-color .3s, transform .15s;
   }
-  .fan-card.on { border-color: rgba(51,230,176,0.5); }
+  .fan-card.on { border-color: rgba(var(--accent-rgb), 0.5); }
   .fan-card:hover { transform: translateY(-2px); }
 
   .fan-card .glow {
@@ -165,10 +276,7 @@
   .clock-hand { transform-box: fill-box; transform-origin: center; }
   #schedule-icon.active .clock-hand { animation: clock-tick 4s linear infinite; }
   @keyframes clock-tick { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
-  /* Zeitplan-Icon: blau, solange ein Timer die Automatik sperrt */
-  #schedule-icon.locked { color: #8fb8ff; }
-
-  /* Timer-Icon: pulsiert, solange ein Timer läuft */
+  /* Zeitplan-Icon: pulsiert, solange ein Timer läuft */
   #timer-icon.active { animation: timer-pulse 1s ease-in-out infinite; }
   @keyframes timer-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
@@ -178,26 +286,30 @@
   /* ---- Toggle switch ---- */
   .switch { --w: 58px; --h: 30px; width: var(--w); height: var(--h); position: relative; cursor: pointer; }
   .switch input { display: none; }
-  .switch .track { position: absolute; inset: 0; background: #263042; border-radius: 999px; border: 1px solid var(--border); transition: background .25s, box-shadow .25s; }
-  .switch .thumb { position: absolute; top: 3px; left: 3px; width: calc(var(--h) - 8px); height: calc(var(--h) - 8px); background: #cfd8e3; border-radius: 50%; transition: transform .25s cubic-bezier(.4,0,.2,1), background .25s; }
-  .switch input:checked + .track { background: linear-gradient(135deg, #1fae86, var(--accent)); box-shadow: 0 0 14px var(--accent-glow); }
+  .switch .track { position: absolute; inset: 0; background: var(--switch-off); border-radius: 999px; border: 1px solid var(--border); transition: background .25s, box-shadow .25s; }
+  .switch .thumb { position: absolute; top: 3px; left: 3px; width: calc(var(--h) - 8px); height: calc(var(--h) - 8px); background: var(--switch-thumb); border-radius: 50%; transition: transform .25s cubic-bezier(.4,0,.2,1), background .25s; }
+  .switch input:checked + .track { background: linear-gradient(135deg, var(--accent-dark), var(--accent)); box-shadow: 0 0 14px var(--accent-glow); }
   .switch input:checked + .track .thumb { transform: translateX(28px); background: #fff; }
   .switch input:disabled + .track { opacity: 0.5; cursor: not-allowed; }
 
-  .switch.warn input:checked + .track { background: linear-gradient(135deg, #b8791f, var(--warn)); box-shadow: 0 0 14px var(--warn-glow); }
+  .switch.warn input:checked + .track { background: linear-gradient(135deg, var(--warn-dark), var(--warn)); box-shadow: 0 0 14px var(--warn-glow); }
 
-  /* Automatik-Schalter: blau statt ausgegraut, solange ein Timer sperrt */
+  /* Automatik-Schalter: Sperr-Farbe statt ausgegraut, solange ein Timer sperrt */
   .switch.locked input:disabled + .track {
-    opacity: 1; background: rgba(143,184,255,0.18); border-color: rgba(143,184,255,0.5);
-    box-shadow: 0 0 10px rgba(143,184,255,0.3);
+    opacity: 1; background: rgba(var(--locked-rgb), 0.18);
+    border-color: rgba(var(--locked-rgb), 0.5);
+    box-shadow: 0 0 10px rgba(var(--locked-rgb), 0.3);
   }
-  .switch.locked input:disabled + .track .thumb { background: #8fb8ff; }
+  .switch.locked input:disabled + .track .thumb { background: var(--locked); }
 
-  /* Speichern-Button: blau statt ausgegraut, solange ein Timer sperrt */
+  /* Speichern-Button: Sperr-Farbe statt ausgegraut, solange ein Timer sperrt */
   #save-schedule.locked:disabled {
     opacity: 1; cursor: not-allowed; box-shadow: none;
-    background: linear-gradient(135deg, #4a7fd6, #8fb8ff); color: #04121f;
+    background: linear-gradient(135deg, var(--locked-dark), var(--locked)); color: #04121f;
   }
+
+  /* Zeitplan-Icon: Sperr-Farbe, solange ein Timer die Automatik sperrt */
+  #schedule-icon.locked { color: var(--locked); }
 
   .fan-state-label { font-size: 12px; color: var(--muted); min-height: 16px; }
 
@@ -238,7 +350,7 @@
   }
   .timer-btn:hover { border-color: var(--accent); color: var(--text); }
   .timer-btn.running {
-    background: linear-gradient(135deg, #1fae86, var(--accent)); color: #04140f;
+    background: linear-gradient(135deg, var(--accent-dark), var(--accent)); color: var(--accent-text);
     border-color: transparent; font-weight: 700;
   }
 
@@ -251,7 +363,7 @@
     display: flex; align-items: center; justify-content: space-between;
     flex-wrap: wrap; gap: 16px;
     margin-bottom: 22px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    box-shadow: none;
   }
   .runtime-card .label { display: flex; align-items: center; gap: 14px; }
   .runtime-card .label .runtime-icon { width: 34px; height: 34px; color: var(--accent); flex-shrink: 0; }
@@ -279,10 +391,14 @@
     padding: 12px 16px; margin-bottom: 10px; flex-wrap: nowrap;
     transition: border-color .2s, box-shadow .2s;
   }
-  .sequence-item.running { border-color: rgba(51,230,176,0.5); box-shadow: 0 0 0 1px rgba(51,230,176,0.15); }
+  .sequence-item:last-child { margin-bottom: 0; }
+  .sequence-item.running { border-color: rgba(var(--accent-rgb), 0.5); box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.15); }
   .sequence-item-info { flex: 1 1 auto; min-width: 0; }
-  .sequence-item-info strong { display: block; }
-  .sequence-item-info .sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; overflow-wrap: break-word; }
+  .sequence-item-info strong { display: block; font-size: 15px; font-weight: 600; }
+  .sequence-item-info .sub { display: block; font-size: 12px; color: var(--muted); letter-spacing: 0.5px; margin-top: 2px; overflow-wrap: break-word; }
+  .sequence-card h2 { margin: 0; font-size: 18px; }
+  .sequence-card span.sub { display: block; color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .sequence-card .card-header { margin-bottom: 16px; }
   .sequence-item-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .sequence-countdown { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); font-size: 13px; white-space: nowrap; }
   .sequence-empty-hint { color: var(--muted); font-size: 13px; padding: 8px 0; }
@@ -306,13 +422,13 @@
   .field select:focus { border-color: var(--accent); }
   .field select:disabled {
     opacity: 1; cursor: not-allowed;
-    background: rgba(143,184,255,0.08); border-color: rgba(143,184,255,0.35); color: #8fb8ff;
+    background: rgba(var(--locked-rgb), 0.08); border-color: rgba(var(--locked-rgb), 0.35); color: var(--locked);
   }
 
   .preview { background: var(--panel-2); border: 1px dashed var(--border); border-radius: 12px; padding: 14px 16px; font-size: 13px; color: var(--muted); margin-bottom: 18px; }
   .preview strong { color: var(--text); }
 
-  .btn { background: linear-gradient(135deg, #1fae86, var(--accent)); color: #04140f; border: none; font-weight: 700; font-size: 14px; padding: 12px 22px; border-radius: 10px; cursor: pointer; box-shadow: 0 6px 20px var(--accent-glow); transition: transform .15s, box-shadow .15s; }
+  .btn { background: linear-gradient(135deg, var(--accent-dark), var(--accent)); color: var(--accent-text); border: none; font-weight: 700; font-size: 14px; padding: 12px 22px; border-radius: 10px; cursor: pointer; box-shadow: 0 6px 20px var(--accent-glow); transition: transform .15s, box-shadow .15s; }
   .btn:hover { transform: translateY(-1px); }
   .btn:active { transform: translateY(0); }
   .btn:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
@@ -320,6 +436,54 @@
   .save-msg { font-size: 13px; margin-left: 14px; color: var(--muted); }
   .save-msg.ok { color: var(--accent); }
   .save-msg.err { color: var(--danger); }
+
+  /* ── Theme-Switcher ───────────────────────────────────────────── */
+  .theme-picker { position: relative; }
+
+  .theme-toggle-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color .2s, color .2s;
+  }
+  .theme-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .theme-toggle-btn svg { width: 16px; height: 16px; }
+
+  .theme-popover {
+    display: none; position: absolute; top: calc(100% + 8px); right: 0;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 14px; padding: 14px;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+    z-index: 100; min-width: 150px;
+  }
+  .theme-popover.open { display: block; }
+  .theme-popover-title {
+    font-size: 12px; color: var(--text); letter-spacing: 0.6px;
+    text-transform: uppercase; margin-bottom: 10px; opacity: 0.6;
+  }
+  .theme-swatches { display: flex; flex-direction: column; gap: 3px; }
+
+  .theme-swatch {
+    display: flex; align-items: center; gap: 10px;
+    background: none; border: 1px solid transparent; border-radius: 8px;
+    padding: 7px 10px; cursor: pointer; color: var(--text); font-size: 13px;
+    transition: background .15s, border-color .15s; width: 100%; text-align: left;
+  }
+  .theme-swatch:hover { background: var(--panel-2); border-color: var(--border); }
+  .theme-swatch.active { border-color: rgba(var(--accent-rgb), 0.5); background: rgba(var(--accent-rgb), 0.07); }
+
+  .swatch-dot {
+    width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0;
+    background: var(--sw, #33e6b0);
+    box-shadow: 0 0 6px var(--sw, #33e6b0);
+    border: 2px solid var(--panel);
+  }
+  .theme-section-label {
+    font-size: 11px; color: var(--text); letter-spacing: 0.5px;
+    text-transform: uppercase; padding: 6px 10px 3px; opacity: 0.45;
+  }
 
   footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 36px; }
 </style>
@@ -332,9 +496,33 @@
       <h1>Lüftersteuerung Rack</h1>
       <p>Raspberry Pi · GPIO-Chip 0 · Live-Steuerung</p>
     </div>
-    <div class="status-pill">
-      <span class="status-dot" id="conn-dot"></span>
-      <span id="conn-text">verbinde…</span>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="theme-picker" id="theme-picker">
+        <button class="theme-toggle-btn" id="theme-toggle-btn" title="Farbschema" aria-label="Farbschema wählen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+          </svg>
+        </button>
+        <div class="theme-popover" id="theme-popover">
+          <div class="theme-popover-title">Farbschema</div>
+          <div class="theme-swatches">
+            <div class="theme-section-label">Dunkel</div>
+            <button class="theme-swatch" data-theme=""      style="--sw:#33e6b0"><span class="swatch-dot"></span><span>Cyber</span></button>
+            <button class="theme-swatch" data-theme="neon"  style="--sw:#b87fff"><span class="swatch-dot"></span><span>Neon</span></button>
+            <button class="theme-swatch" data-theme="rose"  style="--sw:#ff2d7a"><span class="swatch-dot"></span><span>Rose</span></button>
+            <button class="theme-swatch" data-theme="arktis" style="--sw:#00d8e8"><span class="swatch-dot"></span><span>Arktis</span></button>
+            <div class="theme-section-label">Hell</div>
+            <button class="theme-swatch" data-theme="hell"   style="--sw:#0ea868"><span class="swatch-dot"></span><span>Hell</span></button>
+            <button class="theme-swatch" data-theme="sakura" style="--sw:#d44070"><span class="swatch-dot"></span><span>Sakura</span></button>
+            <button class="theme-swatch" data-theme="wald"   style="--sw:#1a7a3a"><span class="swatch-dot"></span><span>Wald</span></button>
+          </div>
+        </div>
+      </div>
+      <div class="status-pill">
+        <span class="status-dot" id="conn-dot"></span>
+        <span id="conn-text">verbinde…</span>
+      </div>
     </div>
   </header>
 
@@ -1236,6 +1424,35 @@ setInterval(pollAutomationAndTimers, 4000);
 setInterval(tickLocalTimers, 1000);
 setInterval(fetchRuntime, 30000); // ändert sich nur langsam, reicht alle 30s
 setInterval(fetchSequenceStatus, 2000); // für einen flüssigen Countdown
+/* ── Theme-Switcher ────────────────────────────────────────────── */
+(function () {
+  const LS_KEY  = 'luefter-theme';
+  const html    = document.documentElement;
+  const btn     = document.getElementById('theme-toggle-btn');
+  const popover = document.getElementById('theme-popover');
+  const swatches = document.querySelectorAll('.theme-swatch');
+
+  function applyTheme(theme) {
+    if (theme) html.setAttribute('data-theme', theme);
+    else        html.removeAttribute('data-theme');
+    swatches.forEach(s => s.classList.toggle('active', s.dataset.theme === theme));
+    localStorage.setItem(LS_KEY, theme || '');
+  }
+
+  applyTheme(localStorage.getItem(LS_KEY) || '');
+
+  btn.addEventListener('click', e => { e.stopPropagation(); popover.classList.toggle('open'); });
+
+  swatches.forEach(s => s.addEventListener('click', () => {
+    applyTheme(s.dataset.theme);
+    popover.classList.remove('open');
+  }));
+
+  document.addEventListener('click', e => {
+    if (!document.getElementById('theme-picker').contains(e.target))
+      popover.classList.remove('open');
+  });
+})();
 </script>
 </body>
 </html>

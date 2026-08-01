@@ -13,7 +13,9 @@ Lüftersteuerung Rack – Backend
 """
 
 import os
+import sys
 import json
+import signal
 import datetime
 import logging
 import threading
@@ -44,6 +46,10 @@ RUNTIME_FILE = os.environ.get(
 SEQUENCES_FILE = os.environ.get(
     "SEQUENCES_FILE",
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "sequences.json"),
+)
+SCHEDULE_FILE = os.environ.get(
+    "SCHEDULE_FILE",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "schedule_state.json"),
 )
 
 GPIOCHIP = os.environ.get("GPIOCHIP", "0")
@@ -230,6 +236,36 @@ def write_cron_block(on_minute, off_minute, enabled, included_pins=None):
     return proc
 
 
+def load_schedule_state():
+    """Lädt die zuletzt gespeicherte Zeitplan-Konfiguration (on_minute,
+    off_minute, enabled). Wird beim Start zur Cron-Wiederherstellung
+    genutzt, falls kein aktiver Block in der crontab gefunden wird."""
+    try:
+        with open(SCHEDULE_FILE) as f:
+            data = json.load(f)
+        return {
+            "on_minute":  int(data["on_minute"]),
+            "off_minute": int(data["off_minute"]),
+            "enabled":    bool(data.get("enabled", True)),
+        }
+    except (FileNotFoundError, KeyError, ValueError, json.JSONDecodeError):
+        return None
+
+
+def save_schedule_state(on_minute, off_minute, enabled):
+    """Persistiert die aktuellen Zeitplan-Einstellungen, damit sie beim
+    nächsten Start (nach sauberem Stop) wiederhergestellt werden können."""
+    try:
+        with open(SCHEDULE_FILE, "w") as f:
+            json.dump({
+                "on_minute":  int(on_minute),
+                "off_minute": int(off_minute),
+                "enabled":    bool(enabled),
+            }, f)
+    except Exception:
+        pass
+
+
 def load_pin_state():
     """Lädt den zuletzt manuell gesetzten Zustand aus einer Datei –
     NICHT per gpioget, da das Lesen den Ausgang zerstören würde."""
@@ -276,6 +312,20 @@ pin_state = load_pin_state()
 
 # {pin: iso_timestamp} - temporär vom Zeitplan ausgenommene Pins.
 excluded_pins = load_excluded_pins()
+
+# Zeitplan-Wiederherstellung beim Start: Falls beim letzten Stop ein
+# sauberer Shutdown durchgeführt wurde (Cron-Block gelöscht), aber eine
+# schedule_state.json existiert, wird der Block automatisch neu angelegt.
+# So muss der Nutzer den Zeitplan nicht jedes Mal manuell neu speichern.
+_saved_schedule = load_schedule_state()
+if _saved_schedule is not None:
+    _current_cron_state = parse_cron_state(read_crontab_text())
+    if not _current_cron_state["found"]:
+        write_cron_block(
+            _saved_schedule["on_minute"],
+            _saved_schedule["off_minute"],
+            _saved_schedule["enabled"],
+        )
 
 
 def load_runtime():
@@ -644,6 +694,9 @@ def set_schedule():
     proc = write_cron_block(on_minute, off_minute, enabled, included_pins=list(PIN_ORDER))
     if proc.returncode != 0:
         return jsonify({"error": proc.stderr.strip() or "crontab-Update fehlgeschlagen"}), 500
+
+    # Zeitplan persistieren – wird beim nächsten Start wiederhergestellt.
+    save_schedule_state(on_minute, off_minute, enabled)
 
     if enabled:
         apply_automation_sync(on_minute, off_minute)
@@ -1196,6 +1249,52 @@ def sequence_status():
 # Laufzeit-Tracker im Hintergrund starten (läuft dauerhaft mit der App).
 runtime_thread = threading.Thread(target=_runtime_tracker_loop, daemon=True)
 runtime_thread.start()
+
+
+# ── Sauberes Beenden (SIGTERM / systemctl stop) ────────────────────────────
+_shutdown_done = False
+
+
+def _shutdown_cleanup():
+    """Wird beim Beenden des Service ausgeführt.
+    Reihenfolge:
+      1. Lüfter-Cron-Block aus crontab entfernen – verhindert, dass
+         geplante Jobs nach dem Stop noch GPIO-Befehle ausführen.
+      2. Alle Lüfter ausschalten – sauberer Ausgangszustand.
+    Ein _shutdown_done-Flag verhindert doppelte Ausführung."""
+    global _shutdown_done
+    if _shutdown_done:
+        return
+    _shutdown_done = True
+
+    # 1. Cron-Block entfernen
+    try:
+        cron_text = read_crontab_text()
+        if cron_text.strip():
+            cleaned = strip_fan_cron_lines(cron_text.splitlines())
+            run_cmd(
+                SUDO + ["crontab", "-"],
+                input_text="\n".join(cleaned).rstrip("\n") + "\n",
+            )
+    except Exception:
+        pass
+
+    # 2. Alle Lüfter ausschalten
+    try:
+        apply_pin_values(list(PIN_ORDER), False)
+    except Exception:
+        pass
+
+
+def _handle_signal(sig, frame):
+    _shutdown_cleanup()
+    sys.exit(0)
+
+
+signal.signal(signal.SIGTERM, _handle_signal)   # systemctl stop
+signal.signal(signal.SIGINT,  _handle_signal)   # Ctrl+C / KeyboardInterrupt
+import atexit
+atexit.register(_shutdown_cleanup)               # normaler Python-Exit
 
 
 if __name__ == "__main__":

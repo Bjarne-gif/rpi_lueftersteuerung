@@ -65,6 +65,61 @@ PIN_LABELS = {
 # (z.B. im Docker-Container). Standard: sudo wird verwendet.
 SUDO = [] if os.environ.get("USE_SUDO", "true").lower() == "false" else ["sudo"]
 
+
+def _detect_gpiod_version():
+    """Erkennt die Hauptversion von gpiod (1 oder 2) einmalig beim Start."""
+    try:
+        r = subprocess.run(
+            ["gpioset", "--version"], capture_output=True, text=True, timeout=3
+        )
+        for part in (r.stdout + r.stderr).split():
+            if part.startswith("v") and "." in part:
+                major = part[1:].split(".")[0]
+                if major.isdigit():
+                    return int(major)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    return 1
+
+
+# v1: gpioset setzt Wert und kehrt sofort zurück.
+# v2: gpioset blockiert – erfordert persistenten Hintergrundprozess.
+GPIOD_VERSION = _detect_gpiod_version()
+
+# Für gpiod v2: ein dauerhafter Popen-Prozess hält alle 4 GPIO-Leitungen.
+# Zustandswechsel = alten Prozess beenden, neuen mit aktuellem Gesamtzustand starten.
+_gpio_popen = None
+_gpio_popen_lock = threading.Lock()
+
+
+def _restart_gpio_popen(state_dict):
+    """Startet gpioset als Hintergrundprozess mit dem vollständigen Pin-Zustand.
+    Beendet vorher den laufenden Prozess. Nur für gpiod v2.
+    Muss unter _gpio_popen_lock aufgerufen werden.
+    Gibt True bei Erfolg zurück, False bei Fehler."""
+    global _gpio_popen
+    if _gpio_popen is not None and _gpio_popen.poll() is None:
+        _gpio_popen.terminate()
+        try:
+            _gpio_popen.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            _gpio_popen.kill()
+            _gpio_popen.wait()
+    _gpio_popen = None
+    args = [f"{p}={'1' if state_dict.get(p, False) else '0'}" for p in PIN_ORDER]
+    cmd = SUDO + ["gpioset", f"--chip={GPIOCHIP}"] + args
+    try:
+        _gpio_popen = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(0.05)
+        if _gpio_popen.poll() is not None:
+            _gpio_popen = None
+            return False
+    except Exception:
+        _gpio_popen = None
+        return False
+    return True
+
+
 CRON_START = "# LUEFTERSTEUERUNG RACK - START"
 CRON_END = "# LUEFTERSTEUERUNG RACK - END"
 
@@ -73,28 +128,35 @@ DEFAULT_OFF_MINUTE = 40
 
 
 def run_cmd(cmd, input_text=None):
-    return subprocess.run(cmd, capture_output=True, text=True, input=input_text)
+    try:
+        return subprocess.run(
+            cmd, capture_output=True, text=True, input=input_text, timeout=5
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(
+            args=cmd, returncode=1, stdout="",
+            stderr="Timeout: Befehl hat nicht rechtzeitig geantwortet",
+        )
 
 
 def _line_is_on_command(content):
-    """Erkennt eine 'Anschalten'-Cronzeile, unabhängig davon, wie viele
-    der 4 Pins gerade tatsächlich enthalten sind (manche können durch
-    manuelle Ausnahmen fehlen)."""
-    return (
-        "gpioset" in content
-        and any(f"{p}=1" in content for p in PIN_ORDER)
-        and not any(f"{p}=0" in content for p in PIN_ORDER)
-    )
+    """Erkennt eine 'Anschalten'-Cronzeile – gpioset (v1) oder curl (v2)."""
+    if "gpioset" in content:
+        return (any(f"{p}=1" in content for p in PIN_ORDER)
+                and not any(f"{p}=0" in content for p in PIN_ORDER))
+    if "curl" in content and "cron/set" in content:
+        return '"state":true' in content
+    return False
 
 
 def _line_is_off_command(content):
-    """Erkennt eine 'Ausschalten'-Cronzeile, unabhängig davon, wie viele
-    der 4 Pins gerade tatsächlich enthalten sind."""
-    return (
-        "gpioset" in content
-        and any(f"{p}=0" in content for p in PIN_ORDER)
-        and not any(f"{p}=1" in content for p in PIN_ORDER)
-    )
+    """Erkennt eine 'Ausschalten'-Cronzeile – gpioset (v1) oder curl (v2)."""
+    if "gpioset" in content:
+        return (any(f"{p}=0" in content for p in PIN_ORDER)
+                and not any(f"{p}=1" in content for p in PIN_ORDER))
+    if "curl" in content and "cron/set" in content:
+        return '"state":false' in content
+    return False
 
 
 def read_crontab_text():
@@ -203,14 +265,24 @@ def build_block(on_minute, off_minute, enabled, included_pins):
     ]
 
     if included_pins:
-        pin_on = " ".join(f"{p}=1" for p in included_pins)
-        pin_off = " ".join(f"{p}=0" for p in included_pins)
-        lines += [
-            f"# Punkt :{int(on_minute):02d} Uhr: Luefter AN (1) - Pins: {','.join(included_pins)}",
-            f"{prefix}{on_minute} * * * * /usr/bin/gpioset {GPIOCHIP} {pin_on}",
-            f"# Punkt :{int(off_minute):02d} Uhr: Luefter AUS (0) - Pins: {','.join(included_pins)}",
-            f"{prefix}{off_minute} * * * * /usr/bin/gpioset {GPIOCHIP} {pin_off}",
-        ]
+        if GPIOD_VERSION >= 2:
+            curl_base = ("/usr/bin/curl -s -X POST http://127.0.0.1:5000/api/cron/set"
+                         " -H 'Content-Type: application/json'")
+            lines += [
+                f"# Punkt :{int(on_minute):02d} Uhr: Luefter AN - App-API (gpiod v2)",
+                f"{prefix}{on_minute} * * * * {curl_base} -d '{{\"state\":true}}'",
+                f"# Punkt :{int(off_minute):02d} Uhr: Luefter AUS - App-API (gpiod v2)",
+                f"{prefix}{off_minute} * * * * {curl_base} -d '{{\"state\":false}}'",
+            ]
+        else:
+            pin_on = " ".join(f"{p}=1" for p in included_pins)
+            pin_off = " ".join(f"{p}=0" for p in included_pins)
+            lines += [
+                f"# Punkt :{int(on_minute):02d} Uhr: Luefter AN (1) - Pins: {','.join(included_pins)}",
+                f"{prefix}{on_minute} * * * * /usr/bin/gpioset {GPIOCHIP} {pin_on}",
+                f"# Punkt :{int(off_minute):02d} Uhr: Luefter AUS (0) - Pins: {','.join(included_pins)}",
+                f"{prefix}{off_minute} * * * * /usr/bin/gpioset {GPIOCHIP} {pin_off}",
+            ]
     else:
         lines.append("# (alle Pins aktuell manuell ausgenommen - kein aktiver Cron-Befehl)")
 
@@ -313,11 +385,28 @@ pin_state = load_pin_state()
 # {pin: iso_timestamp} - temporär vom Zeitplan ausgenommene Pins.
 excluded_pins = load_excluded_pins()
 
+# Für gpiod v2: verwaiste gpioset-Prozesse bereinigen.
+# Den initialen Popen starten wir nur wenn kein aktiver Zeitplan folgt,
+# der ihn sofort überschreiben würde (vermeidet unnötige Race Conditions).
+_saved_schedule = load_schedule_state()
+_schedule_will_sync = (
+    _saved_schedule is not None and _saved_schedule.get("enabled", False)
+)
+
+if GPIOD_VERSION >= 2:
+    subprocess.run(SUDO + ["pkill", "-x", "gpioset"], capture_output=True)
+    time.sleep(0.1)
+    if not _schedule_will_sync:
+        # Kein aktiver Zeitplan → gespeicherten GPIO-Zustand direkt wiederherstellen
+        with _gpio_popen_lock:
+            _restart_gpio_popen(pin_state)
+
 # Zeitplan-Wiederherstellung beim Start: Falls beim letzten Stop ein
 # sauberer Shutdown durchgeführt wurde (Cron-Block gelöscht), aber eine
 # schedule_state.json existiert, wird der Block automatisch neu angelegt.
-# So muss der Nutzer den Zeitplan nicht jedes Mal manuell neu speichern.
-_saved_schedule = load_schedule_state()
+# Anschließend wird der aktuelle Sollzustand sofort angewandt –
+# verhindert, dass Lüfter bis zum nächsten Cron-Trigger im falschen
+# Zustand bleiben (z.B. alle aus nach Shutdown-Cleanup).
 if _saved_schedule is not None:
     _current_cron_state = parse_cron_state(read_crontab_text())
     if not _current_cron_state["found"]:
@@ -325,6 +414,11 @@ if _saved_schedule is not None:
             _saved_schedule["on_minute"],
             _saved_schedule["off_minute"],
             _saved_schedule["enabled"],
+        )
+    if _saved_schedule["enabled"]:
+        apply_automation_sync(
+            _saved_schedule["on_minute"],
+            _saved_schedule["off_minute"],
         )
 
 
@@ -539,8 +633,23 @@ def get_current_pin_values():
 
 
 def apply_pin_values(pins, on):
-    """Schaltet gezielt eine Liste von Pins auf denselben Wert und
-    aktualisiert/persistiert den gespeicherten Zustand."""
+    """Schaltet gezielt eine Liste von Pins auf denselben Wert.
+    gpiod v1: subprocess.run (kehrt sofort zurück).
+    gpiod v2: persistenter Popen-Prozess wird mit aktuellem Gesamtzustand neu gestartet."""
+    if GPIOD_VERSION >= 2:
+        with _gpio_popen_lock:
+            new_state = dict(pin_state)
+            for p in pins:
+                new_state[p] = on
+            ok = _restart_gpio_popen(new_state)
+            if ok:
+                for p in pins:
+                    pin_state[p] = on
+                save_pin_state(pin_state)
+        return subprocess.CompletedProcess(
+            args=[], returncode=0 if ok else 1, stdout="",
+            stderr="" if ok else "gpioset Prozess konnte nicht gestartet werden",
+        )
     value = "1" if on else "0"
     args = [f"{p}={value}" for p in pins]
     result = run_cmd(SUDO + ["gpioset", GPIOCHIP] + args)
@@ -615,14 +724,9 @@ def set_fan(pin):
         # diesen Pin beim nächsten Trigger automatisch zurück.
         exclude_pins_from_automation([pin])
 
-    cmd = SUDO + ["gpioset", GPIOCHIP, f"{pin}={state}"]
-    result = run_cmd(cmd)
+    result = apply_pin_values([pin], state == "1")
     if result.returncode != 0:
         return jsonify({"error": result.stderr.strip() or "gpioset fehlgeschlagen"}), 500
-
-    pin_state[pin] = (state == "1")
-    save_pin_state(pin_state)
-
     return jsonify({"pin": pin, "state": state == "1"})
 
 
@@ -643,16 +747,9 @@ def set_all():
         # automatisch zurück (genau wie beim Einzelschalter).
         exclude_pins_from_automation(pins_to_exclude)
 
-    args = [f"{pin}={state}" for pin in PIN_ORDER]
-    cmd = SUDO + ["gpioset", GPIOCHIP] + args
-    result = run_cmd(cmd)
+    result = apply_pin_values(list(PIN_ORDER), state == "1")
     if result.returncode != 0:
         return jsonify({"error": result.stderr.strip() or "gpioset fehlgeschlagen"}), 500
-
-    for pin in PIN_ORDER:
-        pin_state[pin] = (state == "1")
-    save_pin_state(pin_state)
-
     return jsonify({"state": state == "1"})
 
 
@@ -956,6 +1053,25 @@ def _run_sequence(seq_id, stop_event, steps, loop, participating_pins):
                 "pins": info["participating_pins"],
                 "pre_existing_exclusions": info["pre_existing_exclusions"],
             })
+
+
+@app.route("/api/cron/set", methods=["POST"])
+def cron_set():
+    """Wird von Cron-Jobs unter gpiod v2 aufgerufen statt direktem gpioset.
+    Respektiert manuelle Pin-Ausnahmen (excluded_pins)."""
+    data = request.get_json(silent=True) or {}
+    on = bool(data.get("state"))
+    cron_state = parse_cron_state(read_crontab_text())
+    if (cron_state["found"] and cron_state["on_minute"] is not None
+            and cron_state["off_minute"] is not None):
+        refresh_excluded_pins(cron_state["on_minute"], cron_state["off_minute"])
+    pins_to_set = [p for p in PIN_ORDER if p not in excluded_pins]
+    if not pins_to_set:
+        return jsonify({"ok": True, "pins_set": [], "note": "Alle Pins ausgenommen"})
+    result = apply_pin_values(pins_to_set, on)
+    if result.returncode != 0:
+        return jsonify({"error": result.stderr.strip() or "gpioset fehlgeschlagen"}), 500
+    return jsonify({"ok": True, "pins_set": pins_to_set, "state": on})
 
 
 @app.route("/api/timer/start", methods=["POST"])

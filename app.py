@@ -86,9 +86,54 @@ def _detect_gpiod_version():
 # v2: gpioset blockiert – erfordert persistenten Hintergrundprozess.
 GPIOD_VERSION = _detect_gpiod_version()
 
-# Für gpiod v2: ein dauerhafter Popen-Prozess hält alle 4 GPIO-Leitungen.
-# Zustandswechsel = alten Prozess beenden, neuen mit aktuellem Gesamtzustand starten.
-_gpio_popen = None
+# Für gpiod v2: Python-Bibliothek bevorzugt (kein Subprocess, keine Waisenprozesse).
+# Fallback auf Popen wenn Bibliothek nicht installiert.
+# Installation im Projekt-Venv: pip install gpiod
+_GPIOD_LIB_AVAILABLE = False
+if GPIOD_VERSION >= 2:
+    try:
+        import gpiod as _gpiod_lib
+        from gpiod.line import Direction as _GpioDir, Value as _GpioVal
+        _GPIOD_LIB_AVAILABLE = True
+    except ImportError:
+        pass
+
+# Persistente GPIO-Verbindung (Python-Bibliothek)
+_gpio_lib_request = None
+_gpio_lib_lock    = threading.Lock()
+
+
+def _apply_gpio_lib(state_dict):
+    """Setzt GPIO-Werte über die Python gpiod-Bibliothek (v2).
+    Persistenter LineRequest – kein Subprocess, keine Waisenprozesse."""
+    global _gpio_lib_request
+    with _gpio_lib_lock:
+        try:
+            if _gpio_lib_request is None:
+                chip = _gpiod_lib.Chip(f"/dev/gpiochip{GPIOCHIP}")
+                pins_int = tuple(int(p) for p in PIN_ORDER)
+                _gpio_lib_request = chip.request_lines(
+                    consumer="lueftersteuerung",
+                    config={
+                        pins_int: _gpiod_lib.LineSettings(
+                            direction=_GpioDir.OUTPUT,
+                            output_value=_GpioVal.INACTIVE,
+                        )
+                    },
+                )
+            vals = {
+                int(p): (_GpioVal.ACTIVE if state_dict.get(p, False) else _GpioVal.INACTIVE)
+                for p in PIN_ORDER
+            }
+            _gpio_lib_request.set_values(vals)
+            return True
+        except Exception:
+            _gpio_lib_request = None  # Beim nächsten Aufruf neu aufbauen
+            return False
+
+
+# Popen-Fallback für gpiod v2 (wenn Python-Bibliothek nicht verfügbar)
+_gpio_popen      = None
 _gpio_popen_lock = threading.Lock()
 
 
@@ -96,8 +141,14 @@ def _restart_gpio_popen(state_dict):
     """Startet gpioset als Hintergrundprozess mit dem vollständigen Pin-Zustand.
     Beendet vorher den laufenden Prozess. Nur für gpiod v2.
     Muss unter _gpio_popen_lock aufgerufen werden.
-    Gibt True bei Erfolg zurück, False bei Fehler."""
+
+    Wichtig: sudo leitet SIGTERM nicht immer an den gpioset-Kindprozess weiter.
+    gpioset kann daher als Waisenprozess weiterlaufen und die GPIO-Leitungen
+    blockieren. Deshalb wird zusätzlich pkill verwendet, um verwaiste Prozesse
+    sicher zu beenden, bevor ein neuer gestartet wird."""
     global _gpio_popen
+
+    # sudo-Wrapper beenden
     if _gpio_popen is not None and _gpio_popen.poll() is None:
         _gpio_popen.terminate()
         try:
@@ -106,6 +157,11 @@ def _restart_gpio_popen(state_dict):
             _gpio_popen.kill()
             _gpio_popen.wait()
     _gpio_popen = None
+
+    # Verwaiste gpioset-Prozesse killen (sudo leitet SIGTERM nicht immer weiter)
+    subprocess.run(SUDO + ["pkill", "-x", "gpioset"], capture_output=True)
+    time.sleep(0.08)  # Kurz warten bis GPIO-Leitungen freigegeben sind
+
     args = [f"{p}={'1' if state_dict.get(p, False) else '0'}" for p in PIN_ORDER]
     cmd = SUDO + ["gpioset", f"--chip={GPIOCHIP}"] + args
     try:
@@ -394,12 +450,17 @@ _schedule_will_sync = (
 )
 
 if GPIOD_VERSION >= 2:
-    subprocess.run(SUDO + ["pkill", "-x", "gpioset"], capture_output=True)
-    time.sleep(0.1)
-    if not _schedule_will_sync:
-        # Kein aktiver Zeitplan → gespeicherten GPIO-Zustand direkt wiederherstellen
-        with _gpio_popen_lock:
-            _restart_gpio_popen(pin_state)
+    if _GPIOD_LIB_AVAILABLE:
+        # Python-Bibliothek: direkt initialisieren, kein pkill nötig
+        if not _schedule_will_sync:
+            _apply_gpio_lib(pin_state)
+    else:
+        # Popen-Fallback: verwaiste gpioset-Prozesse bereinigen
+        subprocess.run(SUDO + ["pkill", "-x", "gpioset"], capture_output=True)
+        time.sleep(0.1)
+        if not _schedule_will_sync:
+            with _gpio_popen_lock:
+                _restart_gpio_popen(pin_state)
 
 # Zeitplan-Wiederherstellung beim Start: Falls beim letzten Stop ein
 # sauberer Shutdown durchgeführt wurde (Cron-Block gelöscht), aber eine
@@ -415,11 +476,7 @@ if _saved_schedule is not None:
             _saved_schedule["off_minute"],
             _saved_schedule["enabled"],
         )
-    if _saved_schedule["enabled"]:
-        apply_automation_sync(
-            _saved_schedule["on_minute"],
-            _saved_schedule["off_minute"],
-        )
+    # apply_automation_sync wird nach allen Funktionsdefinitionen aufgerufen
 
 
 def load_runtime():
@@ -634,24 +691,31 @@ def get_current_pin_values():
 
 def apply_pin_values(pins, on):
     """Schaltet gezielt eine Liste von Pins auf denselben Wert.
-    gpiod v1: subprocess.run (kehrt sofort zurück).
-    gpiod v2: persistenter Popen-Prozess wird mit aktuellem Gesamtzustand neu gestartet."""
+    gpiod v1 : subprocess.run (kehrt sofort zurück).
+    gpiod v2 + Python-Lib: persistenter LineRequest, kein Subprocess.
+    gpiod v2 + Popen-Fallback: Hintergrundprozess wird neu gestartet."""
     if GPIOD_VERSION >= 2:
-        with _gpio_popen_lock:
-            new_state = dict(pin_state)
+        new_state = dict(pin_state)
+        for p in pins:
+            new_state[p] = on
+
+        if _GPIOD_LIB_AVAILABLE:
+            ok = _apply_gpio_lib(new_state)
+        else:
+            with _gpio_popen_lock:
+                ok = _restart_gpio_popen(new_state)
+
+        if ok:
             for p in pins:
-                new_state[p] = on
-            ok = _restart_gpio_popen(new_state)
-            if ok:
-                for p in pins:
-                    pin_state[p] = on
-                save_pin_state(pin_state)
+                pin_state[p] = on
+            save_pin_state(pin_state)
         return subprocess.CompletedProcess(
             args=[], returncode=0 if ok else 1, stdout="",
-            stderr="" if ok else "gpioset Prozess konnte nicht gestartet werden",
+            stderr="" if ok else "GPIO-Steuerung fehlgeschlagen",
         )
+
     value = "1" if on else "0"
-    args = [f"{p}={value}" for p in pins]
+    args  = [f"{p}={value}" for p in pins]
     result = run_cmd(SUDO + ["gpioset", GPIOCHIP] + args)
     if result.returncode == 0:
         for p in pins:
@@ -1361,6 +1425,15 @@ def sequence_status():
             }
         })
 
+
+# Zeitplan-Zustand sofort anwenden (hier, nach allen Funktionsdefinitionen).
+# Verhindert dass Lüfter bis zum nächsten Cron-Trigger im falschen Zustand
+# bleiben – z.B. alle aus nach Shutdown-Cleanup, obwohl wir im An-Fenster sind.
+if _saved_schedule is not None and _saved_schedule["enabled"]:
+    apply_automation_sync(
+        _saved_schedule["on_minute"],
+        _saved_schedule["off_minute"],
+    )
 
 # Laufzeit-Tracker im Hintergrund starten (läuft dauerhaft mit der App).
 runtime_thread = threading.Thread(target=_runtime_tracker_loop, daemon=True)

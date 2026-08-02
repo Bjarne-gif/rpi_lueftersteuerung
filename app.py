@@ -1007,7 +1007,13 @@ def _revert_to_previous(entry):
     sofortigem Sync, statt sie hart auszuschalten. Pins, die schon VOR
     dem Timer individuell ausgenommen waren (z.B. ein manuell
     ausgeschalteter Lüfter), kehren in genau diesen Zustand zurück,
-    statt pauschal dem Zeitplan zu folgen."""
+    statt pauschal dem Zeitplan zu folgen.
+
+    Ausnahme: wurde der Timer ohne aktive Automatik gestartet
+    (was_automation_active=False), werden Fans beim Ende immer
+    ausgeschaltet – auch wenn die Automatik inzwischen aktiv ist.
+    Das sichert das Sicherheitstimer-Verhalten: manuell an → Timer →
+    immer aus, egal was der Zeitplan sagt."""
     for p in entry["pins"]:
         excluded_pins.pop(p, None)
 
@@ -1017,7 +1023,14 @@ def _revert_to_previous(entry):
         and current["on_minute"] is not None and current["off_minute"] is not None
     )
 
-    if automation_now_active:
+    # was_automation_active ist im Timer-Eintrag gespeichert.
+    # Für Sequenzen (kein Eintrag) wird der aktuelle Status genutzt.
+    was_automation_active = entry.get("was_automation_active")
+    use_automation = automation_now_active and (
+        was_automation_active is None or was_automation_active
+    )
+
+    if use_automation:
         on_minute = current["on_minute"]
         off_minute = current["off_minute"]
         pre_existing = entry.get("pre_existing_exclusions") or {}

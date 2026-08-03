@@ -143,6 +143,8 @@
     color: var(--text);
     font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
     padding: 32px 16px 80px;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .wrap { max-width: 960px; margin: 0 auto; position: relative; z-index: 1; }
@@ -741,7 +743,7 @@ function updateFanUI(pin, on, excluded = false) {
   input.checked = on;
   card.classList.toggle("on", on);
   const base = on ? "läuft" : "gestoppt";
-  label.textContent = excluded ? `${base} · manuell` : base;
+  label.textContent = excluded ? "manuell" : "";
 }
 
 function updateMasterUI(pinsStatus) {
@@ -1468,173 +1470,272 @@ setInterval(fetchSequenceStatus, 2000); // für einen flüssigen Countdown
 /* ── Airflow Particle System ─────────────────────────────────────── */
 (function () {
   'use strict';
-
   const canvas = document.getElementById('airflow-canvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
   const CFG = {
-    maxParticles : 130,
-    baseOpacity  : 0.16,    // Ambient-Partikel
-    fanOpacity   : 0.38,    // Partikel aktiver Lüfter
-    trailLen     : 7,
-    mouseRadius  : 100,
-    minMouseSpeed: 1.5,
+    maxParticles  : 260,
+    baseOpacity   : 0.22,
+    fanOpacity    : 0.50,
+    trailLen      : 11,
+    attractRadius : 580,
+    attractForce  : 0.16,
+    mouseRadius   : 140,    // etwas größerer Einflussbereich
+    mouseTurb     : 0.075,  // erhöhte Turbulenz (war 0.042)
+    mouseGrav     : 0.048,  // neue: konstante Anziehung zur Maus
+    mouseGravZone : 90,     // Radius der Maus-Gravitation (ruhig oder langsam)
+    minMouseSpeed : 0.0,    // Turbulenz schon bei kleinster Bewegung
+    shockMaxR     : 155,
+    shockSpeed    : 4.2,
+    shockStrength : 3.8,
+    shockWidth    : 28,
+    flashDecay    : 0.018,  // Wie schnell Partikel-Farbe zurückfadet
   };
 
   let W, H, frame = 0, flowT = 0;
-  let particles = [], emitters = [];
+  let particles = [], emitters = [], shocks = [];
   let accentRgb = '51,230,176';
+  let accentParts = [51, 230, 176]; // parsed für Farbinterpolation
   const mouse = { x: -999, y: -999, lx: -999, ly: -999, speed: 0 };
 
-  function resize() {
-    W = canvas.width  = window.innerWidth;
-    H = canvas.height = window.innerHeight;
-  }
+  function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
 
   function readAccent() {
-    const v = getComputedStyle(document.documentElement)
-                .getPropertyValue('--accent-rgb').trim();
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim();
     accentRgb = v || '51,230,176';
+    accentParts = accentRgb.split(',').map(Number);
   }
 
   function updateEmitters() {
     emitters = [];
     document.querySelectorAll('.fan-card').forEach(card => {
-      const on   = card.classList.contains('on');
-      const wrap = card.querySelector('.fan-icon-wrap');
-      if (!wrap) return;
-      const r = wrap.getBoundingClientRect();
-      emitters.push({ x: r.left + r.width * .5, y: r.top + r.height * .5, on });
+      const on = card.classList.contains('on');
+      const r  = card.getBoundingClientRect();
+      if (r.width === 0) return;
+      emitters.push({ on, left: r.left, top: r.top, right: r.right, bottom: r.bottom, w: r.width, h: r.height });
     });
   }
 
-  /* Strömungsfeld: Überlagerung langsam ändernder Sinus-Wellen */
+  function nearestEdge(px, py, e) {
+    const ex = Math.max(e.left, Math.min(e.right,  px));
+    const ey = Math.max(e.top,  Math.min(e.bottom, py));
+    return { ex, ey, dist: Math.hypot(ex - px, ey - py) };
+  }
+
   function flowAt(x, y) {
-    const nx = x / W, ny = y / H, t = flowT;
-    const a = Math.sin(nx * 2.8 + t * .28) * Math.cos(ny * 1.9 + t * .19)
-            + Math.sin(ny * 3.3 + t * .44) * .38
-            + Math.cos(nx * 4.7 - t * .13) * .18;
-    return { fx: Math.cos(a * Math.PI) * .22,
-             fy: Math.sin(a * Math.PI) * .16 - .04 };
+    const nx = x/W, ny = y/H, t = flowT;
+    const a = Math.sin(nx*2.5 + t*.22)*Math.cos(ny*1.7 + t*.17) + Math.sin(ny*3.0 + t*.38)*.3;
+    return { fx: Math.cos(a*Math.PI)*.10, fy: Math.sin(a*Math.PI)*.08 - .015 };
   }
 
   function spawn(x, y, vx, vy, active) {
     if (particles.length >= CFG.maxParticles) return;
     particles.push({
       x, y, vx, vy,
-      life  : 1.0,
-      decay : .0035 + Math.random() * .005,
-      size  : active ? 2.5 + Math.random() * 3.0 : 1.8 + Math.random() * 2.2,
-      maxOp : active ? CFG.fanOpacity : CFG.baseOpacity,
-      trail : [],
+      life      : 1.0,
+      decay     : .0010 + Math.random()*.0016,
+      size      : active ? 2.8 + Math.random()*3.5 : 1.8 + Math.random()*2.5,
+      maxOp     : active ? CFG.fanOpacity : CFG.baseOpacity,
+      trail     : [],
+      flashLife : 0,   // 0..1 → Farbüberblendung zu Weiß nach Schockwelle
     });
   }
 
-  function update() {
-    flowT += .016;
+  function spawnAmbient() {
+    const zone = Math.random();
+    let x, y, vx = (Math.random()-.5)*.35, vy = (Math.random()-.5)*.35;
+    if      (zone < .22) { x = Math.random()*W*.45;          y = Math.random()*H; }
+    else if (zone < .44) { x = W*.55+Math.random()*W*.45;    y = Math.random()*H; }
+    else if (zone < .60) { x = Math.random()*W;              y = -5;  vy =  .2+Math.random()*.3; }
+    else if (zone < .76) { x = Math.random()*W;              y = H+5; vy = -.2-Math.random()*.3; }
+    else if (zone < .88) { x = -5;  y = Math.random()*H;    vx =  .15+Math.random()*.3; }
+    else if (zone < .96) { x = W+5; y = Math.random()*H;    vx = -.15-Math.random()*.3; }
+    else                 { x = Math.random()*W;              y = Math.random()*H; }
+    spawn(x, y, vx, vy, false);
+  }
 
-    /* Partikel von Lüftern */
-    emitters.forEach(e => {
-      const rate = e.on ? 4.0 : 1.2;
-      if (Math.random() * 60 < rate) {
-        const a = Math.random() * Math.PI * 2;
-        const sp = e.on ? .4 + Math.random() * .8 : .12 + Math.random() * .25;
-        spawn(e.x + (Math.random()-.5)*22, e.y + (Math.random()-.5)*22,
-              Math.cos(a)*sp, Math.sin(a)*sp, e.on);
-      }
+  function spawnFromEdge(e) {
+    const perim = 2*(e.w+e.h), t = Math.random()*perim;
+    let x, y, nx, ny;
+    if      (t < e.w)        { x = e.left+t;             y = e.top;    nx=0; ny=-1; }
+    else if (t < e.w+e.h)   { x = e.right;              y = e.top+t-e.w;    nx=1; ny=0; }
+    else if (t < 2*e.w+e.h) { x = e.right-(t-e.w-e.h); y = e.bottom; nx=0; ny=1; }
+    else                     { x = e.left; y = e.bottom-(t-2*e.w-e.h); nx=-1; ny=0; }
+    const sp = .3+Math.random()*.6;
+    spawn(x, y, nx*sp+(Math.random()-.5)*.2, ny*sp+(Math.random()-.5)*.2, true);
+  }
+
+  /* Schockwelle auslösen */
+  function triggerShock(cx, cy) {
+    shocks.push({ x: cx, y: cy, r: 0, alpha: 1.0 });
+  }
+
+  function update() {
+    flowT += .013;
+    if (Math.random() < .85 && particles.length < CFG.maxParticles) spawnAmbient();
+    emitters.forEach(e => { if (e.on && Math.random()*60 < 3.5) spawnFromEdge(e); });
+
+    /* Schockwellen expandieren */
+    shocks = shocks.filter(s => {
+      s.r    += CFG.shockSpeed;
+      s.alpha = Math.pow(1 - s.r/CFG.shockMaxR, 1.3);
+      return s.r < CFG.shockMaxR;
     });
 
-    /* Ambient-Partikel über die gesamte Seite */
-    if (Math.random() < .55 && particles.length < CFG.maxParticles * .65) {
-      spawn(Math.random()*W, 40 + Math.random()*(H-80),
-            (Math.random()-.5)*.3, -Math.random()*.2, false);
-    }
-
-    /* Partikel bewegen */
     particles = particles.filter(p => {
       p.trail.push({ x: p.x, y: p.y });
       if (p.trail.length > CFG.trailLen) p.trail.shift();
 
       const {fx, fy} = flowAt(p.x, p.y);
-      p.vx = p.vx * .968 + fx * .055;
-      p.vy = p.vy * .968 + fy * .055;
+      p.vx = p.vx*.972 + fx*.035;
+      p.vy = p.vy*.972 + fy*.035;
 
-      /* Maus-Wirbel */
-      const dx = p.x - mouse.x, dy = p.y - mouse.y;
-      const d  = Math.hypot(dx, dy);
+      /* Lüfter-Anziehung */
+      emitters.forEach(e => {
+        if (!e.on) return;
+        const {ex, ey, dist} = nearestEdge(p.x, p.y, e);
+        if (dist < 2) { p.life -= .07; return; }
+        if (dist < CFG.attractRadius) {
+          const t = 1 - dist/CFG.attractRadius;
+          const f = t*t*CFG.attractForce;
+          p.vx += (ex-p.x)/dist*f;
+          p.vy += (ey-p.y)/dist*f;
+        }
+      });
+
+      /* Schockwellen-Kraftstoß */
+      shocks.forEach(s => {
+        const dx = p.x-s.x, dy = p.y-s.y;
+        const dist = Math.hypot(dx, dy);
+        const ringDist = Math.abs(dist - s.r);
+        if (ringDist < CFG.shockWidth && dist > 0.5) {
+          const f = CFG.shockStrength * (1 - ringDist/CFG.shockWidth) * s.alpha;
+          p.vx += dx/dist * f;
+          p.vy += dy/dist * f;
+          if (ringDist < CFG.shockWidth * .6) p.flashLife = 1.0; // Farbblitz
+        }
+      });
+
+      /* Partikel-Flash langsam ausblenden */
+      if (p.flashLife > 0) p.flashLife = Math.max(0, p.flashLife - CFG.flashDecay);
+
+      /* ── Erhöhte Maus-Interaktion ── */
+      const dx = p.x-mouse.x, dy = p.y-mouse.y, d = Math.hypot(dx, dy);
+      /* Turbulenz: Wirbel proportional zur Mausgeschwindigkeit */
       if (d < CFG.mouseRadius && mouse.speed > CFG.minMouseSpeed) {
-        const f = (1 - d/CFG.mouseRadius) * mouse.speed * .04;
+        const f   = (1 - d/CFG.mouseRadius) * mouse.speed * CFG.mouseTurb;
         const ang = Math.atan2(dy, dx);
-        p.vx += Math.cos(ang + Math.PI*.55) * f;
-        p.vy += Math.sin(ang + Math.PI*.55) * f;
-        if (d > .5) { p.vx += dx/d*f*.28; p.vy += dy/d*f*.28; }
+        p.vx += Math.cos(ang+Math.PI*.55)*f + dx/(d+.1)*f*.32;
+        p.vy += Math.sin(ang+Math.PI*.55)*f + dy/(d+.1)*f*.32;
+      }
+      /* Gravitation: konstante Anziehung zur Maus auch ohne Bewegung */
+      if (d > 4 && d < CFG.mouseGravZone) {
+        const f = (1 - d/CFG.mouseGravZone) * CFG.mouseGrav;
+        p.vx -= dx/d * f;  // zur Maus hin (negativ weil dx = p-mouse)
+        p.vy -= dy/d * f;
       }
 
+      const spd = Math.hypot(p.vx, p.vy);
+      if (spd > 3.2) { p.vx = p.vx/spd*3.2; p.vy = p.vy/spd*3.2; }
+
       p.x += p.vx; p.y += p.vy; p.life -= p.decay;
-      return p.life > 0 && p.x > -40 && p.x < W+40 && p.y > -40 && p.y < H+40;
+      return p.life > 0 && p.x > -80 && p.x < W+80 && p.y > -80 && p.y < H+80;
     });
   }
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
     const rgb = accentRgb;
+    const [ar, ag, ab] = accentParts;
+
+    /* Schockwellen-Ringe zeichnen */
+    shocks.forEach(s => {
+      /* Weicher Glowing-Ring */
+      const inner = Math.max(0, s.r - 20), outer = s.r + 18;
+      const g = ctx.createRadialGradient(s.x, s.y, inner, s.x, s.y, outer);
+      g.addColorStop(0,    `rgba(${rgb},0)`);
+      g.addColorStop(0.45, `rgba(${rgb},${s.alpha * .15})`);
+      g.addColorStop(0.72, `rgba(${rgb},${s.alpha * .06})`);
+      g.addColorStop(1,    `rgba(${rgb},0)`);
+      ctx.beginPath(); ctx.arc(s.x, s.y, outer, 0, Math.PI*2);
+      ctx.fillStyle = g; ctx.fill();
+      /* Harter Rand */
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(${rgb},${s.alpha * .38})`;
+      ctx.lineWidth = 1.2; ctx.stroke();
+    });
+
+    /* Partikel zeichnen */
     particles.forEach(p => {
       const alpha = p.life * p.maxOp;
-      if (alpha < .008) return;
+      if (alpha < .006) return;
+
+      /* Farbe: Interpolation Akzent → Weiß bei Flash */
+      const fl = p.flashLife;
+      const pr = Math.round(ar + (255-ar)*fl);
+      const pg = Math.round(ag + (255-ag)*fl);
+      const pb = Math.round(ab + (255-ab)*fl);
+      const pRgb = `${pr},${pg},${pb}`;
+      const pAlpha = fl > 0 ? Math.min(alpha * (1 + fl * 1.8), 0.95) : alpha;
 
       /* Trail */
       if (p.trail.length > 1) {
         ctx.beginPath();
         ctx.moveTo(p.trail[0].x, p.trail[0].y);
-        for (let i = 1; i < p.trail.length; i++)
-          ctx.lineTo(p.trail[i].x, p.trail[i].y);
-        ctx.strokeStyle = `rgba(${rgb},${alpha * .35})`;
-        ctx.lineWidth   = p.size * .45;
-        ctx.lineCap     = 'round';
-        ctx.stroke();
+        for (let i = 1; i < p.trail.length; i++) ctx.lineTo(p.trail[i].x, p.trail[i].y);
+        ctx.strokeStyle = `rgba(${pRgb},${pAlpha*.30})`; ctx.lineWidth = p.size*.38;
+        ctx.lineCap = 'round'; ctx.stroke();
       }
 
-      /* Partikel-Kopf mit weichem Glow */
-      const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 2.2);
-      g.addColorStop(0,   `rgba(${rgb},${alpha})`);
-      g.addColorStop(.5,  `rgba(${rgb},${alpha * .4})`);
-      g.addColorStop(1,   `rgba(${rgb},0)`);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * 2.2, 0, Math.PI*2);
-      ctx.fillStyle = g;
-      ctx.fill();
+      /* Glow */
+      const r = p.size * (fl > 0 ? 3.2 : 2.6);
+      const g2 = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      g2.addColorStop(0,    `rgba(${pRgb},${pAlpha})`);
+      g2.addColorStop(.42,  `rgba(${pRgb},${pAlpha*.35})`);
+      g2.addColorStop(1,    `rgba(${pRgb},0)`);
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+      ctx.fillStyle = g2; ctx.fill();
     });
   }
 
   function loop() {
     frame++;
-    mouse.speed = Math.hypot(mouse.x - mouse.lx, mouse.y - mouse.ly);
+    mouse.speed = Math.hypot(mouse.x-mouse.lx, mouse.y-mouse.ly);
     mouse.lx = mouse.x; mouse.ly = mouse.y;
     if (frame % 45 === 0) { updateEmitters(); readAccent(); }
     update(); draw();
     requestAnimationFrame(loop);
   }
 
-  /* Init */
   resize(); updateEmitters(); readAccent();
   window.addEventListener('resize', resize);
   window.addEventListener('mousemove', e => {
     mouse.lx = mouse.x; mouse.ly = mouse.y;
-    mouse.x  = e.clientX; mouse.y  = e.clientY;
+    mouse.x = e.clientX; mouse.y = e.clientY;
   });
-  window.addEventListener('mouseleave', () => { mouse.x = -999; mouse.y = -999; mouse.speed = 0; });
+  window.addEventListener('mouseleave', () => { mouse.x=-999; mouse.y=-999; mouse.speed=0; });
+  window.addEventListener('click', e => {
+    // Schockwelle nur bei Klick auf Hintergrund – nicht auf UI-Elemente
+    const onUi = e.target.closest(
+      'button, input, select, label, a, ' +
+      '.fan-card, .master-card, .timer-card, .schedule-card, ' +
+      '.runtime-card, .sequence-card, .sequence-item, ' +
+      '.switch, .theme-picker, .status-pill, ' +
+      '.timer-btn, .btn, .field, .section-icon'
+    );
+    if (!onUi) triggerShock(e.clientX, e.clientY);
+  });
   new MutationObserver(readAccent)
-    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    .observe(document.documentElement, { attributes:true, attributeFilter:['data-theme'] });
 
-  /* Kleine initiale Ladung damit sofort etwas zu sehen ist */
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++)
     spawn(Math.random()*window.innerWidth, Math.random()*window.innerHeight,
-          (Math.random()-.5)*.5, -Math.random()*.3, false);
-  }
+          (Math.random()-.5)*.5, (Math.random()-.5)*.5, false);
 
   requestAnimationFrame(loop);
 })();
+
 </script>
 </body>
 </html>

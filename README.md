@@ -13,7 +13,7 @@ Anleitung zur Einrichtung befindet sich in README_more.md.
 
 ## Promotion
 
-https://www.youtube.com/shorts/G2Y0PIfUGNg
+
 
 ## Hardware
 >**Raspberry Pi 5** (16 GB)

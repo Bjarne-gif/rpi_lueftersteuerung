@@ -28,7 +28,7 @@ Anleitung zur Einrichtung befindet sich in README_more.md.
 
 >**DIGITUS 4-Fach Steckdosenleiste** - 1HE - 10-Zoll (254 mm) - Rack-Montage in Netzwerk-Schrank - DN-95418 - Silber/Schwarz | 4x CEE 7/3 – 16A 4000W – 2 m Zuleitung – PDU für 10-Zoll (254 mm) Netzwerkschränke
 
-**Wandverteiler RBA - 10" Gehäuse** für kleine Hausanschlussnetze (SOHO), IP20, Tragkraft 20 kg.
+>**Wandverteiler RBA - 10" Gehäuse** für kleine Hausanschlussnetze (SOHO), IP20, Tragkraft 20 kg.
 
 ## WICHTIGE HINWEISE
 

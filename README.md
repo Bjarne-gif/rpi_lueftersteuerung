@@ -34,7 +34,8 @@ Eine Dokumentation zur Verkabelung für den RPI4b und RPI5 werden bald hier hinz
 
 ## GUI 
 
-<img width="611" height="1152" alt="image" src="https://github.com/user-attachments/assets/4df904c0-ad34-43a0-9f2b-2c33af4d88cd" />
+<img width="1064" height="1198" alt="lueftergravity1" src="https://github.com/user-attachments/assets/54f403a9-90b1-498c-a1a2-2709b855e0b2" />
+
 
 
 

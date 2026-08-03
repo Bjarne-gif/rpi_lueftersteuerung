@@ -30,7 +30,7 @@ Anleitung zur Einrichtung befindet sich in README_more.md.
 
 >**Wandverteiler RBA - 10" Gehäuse** für kleine Hausanschlussnetze (SOHO), IP20, Tragkraft 20 kg.
 
->**Triton RAX-VL-X09-X1 Vertikale Montageleiste 9HE**
+>**Triton RAX-VL-X09-X1 Vertikale Montageleiste** 9HE
 
 ## WICHTIGE HINWEISE
 

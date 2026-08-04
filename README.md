@@ -23,7 +23,6 @@ Anleitung zur Einrichtung befindet sich in README_more.md.
 
 >**deleyCON 20x M6 Käfigmuttern Schrauben Set für Netzwerkschränke - 20er Set** Patchpanel Racks Servergehäuse 19 Zoll 10 Zoll Montagesatz Stahl - Schwarz
 
-
 >**GeeekPi 10 Zoll 2U Rack-Halterung für Raspberry Pi 5**, mit 4PCS PCIe auf M.2 NVMe SSD Adaptern, hält bis zu 4 Raspberry Pi 5 Boards, kompatibel mit DeskPi RackMate T1/T0/T2/10 Zoll Server Rack
 >(Kann auch mit RPI4B genutzt werden um ggf Strom durch USB-C zu ziehen, nur die SSD Unterstützung (Breitbandkabel) kann dann nicht angeschlossen werden.)
 

@@ -7,7 +7,7 @@ GPIO Steuerung für Raspberry PI Lüfter (4 Stk) im 10 zoll Rack.
 
 Steuerung erfolgt über GUI im Browser gehostet auf dem RPI. (Port 5000)
 
-Docker Unterstützung wird nachdem ein sehr stabiler Zustand der Applikation erreicht ist nachträglich umgesetzt.
+Docker Unterstützung wird nachträglich umgesetzt.
 
 Anleitung zur Einrichtung befindet sich in README_more.md.
 

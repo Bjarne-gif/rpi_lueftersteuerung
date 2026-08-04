@@ -32,7 +32,10 @@ Anleitung zur Einrichtung befindet sich in README_more.md.
 
 >**UGREEN Nexode Desktop Ladegerät (200W, 8-Port, GaN)**
 
->**Raspberry Pi 5** (16 GB)
+>**UGREEN USB C Kabel 100W Ladekabel USB-C 2 Stück PD 3.0 Schnellladekabel PPS USB C auf USB C** Kabel für iPhone 17/Air/16/15 Serie, MacBook Pro/Air, iPad Pro, Galaxy S24, Pixel 9, Steam Deck usw **(0.5M)**
+>(Für Raspberry PI4B Strom über USBC Ugreen Nexode Desktop Ladegerät)
+
+>**Raspberry Pi 5** (16 GB) oder Raspberry PI 4B (Raspberry PI 5 kann nicht mit dem Ugreen Netzteil betrieben werden, sondern benötigt separaten Strom, ich empfehle 2x RPI 5 2x RPI 4B !)
 
 >**GeeekPi 2PCS Raspberry Pi 4 Lüfter** – DC 5V Brushless RGB CPU PWM Lüfter mit blauer Hintergrundbeleuchtung (40x40x10mm, für Raspberry Pi 4 Modell B, 3B+, Raspberry Pi 3/2 Modell B, Gefärbt) 
 

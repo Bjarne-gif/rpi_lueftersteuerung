@@ -28,6 +28,10 @@ Anleitung zur Einrichtung befindet sich in README_more.md.
 
 >**DIGITUS 4-Fach Steckdosenleiste** - 1HE - 10-Zoll (254 mm) - Rack-Montage in Netzwerk-Schrank - DN-95418 - Silber/Schwarz | 4x CEE 7/3 – 16A 4000W – 2 m Zuleitung – PDU für 10-Zoll (254 mm) Netzwerkschränke
 
+>**UGREEN 200W Nexode - 10-Zoll Rack-Halterung**
+
+>**UGREEN Nexode Desktop Ladegerät (200W, 8-Port, GaN)**
+
 >**Raspberry Pi 5** (16 GB)
 
 >**GeeekPi 2PCS Raspberry Pi 4 Lüfter** – DC 5V Brushless RGB CPU PWM Lüfter mit blauer Hintergrundbeleuchtung (40x40x10mm, für Raspberry Pi 4 Modell B, 3B+, Raspberry Pi 3/2 Modell B, Gefärbt) 

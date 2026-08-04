@@ -11,10 +11,6 @@ Docker Unterstützung wird nachdem ein sehr stabiler Zustand der Applikation err
 
 Anleitung zur Einrichtung befindet sich in README_more.md.
 
-## Promotion
-
-
-
 ## Hardware
 
 >**Wandverteiler RBA - 10" Gehäuse** für kleine Hausanschlussnetze (SOHO), IP20, Tragkraft 20 kg.
@@ -52,7 +48,7 @@ Falsche Verkabelung der Lüfter kann zu Schaden an der Hardware führen, bitte b
 
 Eine Dokumentation zur Verkabelung für den RPI4b und RPI5 werden bald hier hinzugefügt.
 
-## GUI 
+## Promotion / GUI
 
 <img width="1064" height="1198" alt="lueftergravity1" src="https://github.com/user-attachments/assets/54f403a9-90b1-498c-a1a2-2709b855e0b2" />
 

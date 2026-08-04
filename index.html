@@ -170,6 +170,8 @@
 
   .title-block h1 { margin: 0; font-size: 26px; letter-spacing: 0.5px; }
   .title-block p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  /* Titel ist nicht interaktiv – Klicks zum Hintergrund durchreichen */
+  .title-block { pointer-events: none; }
 
   .status-pill {
     display: flex; align-items: center; gap: 8px;
@@ -1718,11 +1720,11 @@ setInterval(fetchSequenceStatus, 2000); // für einen flüssigen Countdown
   window.addEventListener('click', e => {
     // Schockwelle nur bei Klick auf Hintergrund – nicht auf UI-Elemente
     const onUi = e.target.closest(
-      'button, input, select, label, a, ' +
+      'button, input, select, label, a, [role="button"], ' +
+      '.switch, .theme-picker, .status-pill, ' +
       '.fan-card, .master-card, .timer-card, .schedule-card, ' +
       '.runtime-card, .sequence-card, .sequence-item, ' +
-      '.switch, .theme-picker, .status-pill, ' +
-      '.timer-btn, .btn, .field, .section-icon'
+      '.btn, .field, .section-icon'
     );
     if (!onUi) triggerShock(e.clientX, e.clientY);
   });

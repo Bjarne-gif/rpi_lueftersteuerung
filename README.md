@@ -24,7 +24,6 @@ Anleitung zur Einrichtung befindet sich in README_more.md.
 >**deleyCON 20x M6 Käfigmuttern Schrauben Set für Netzwerkschränke - 20er Set** Patchpanel Racks Servergehäuse 19 Zoll 10 Zoll Montagesatz Stahl - Schwarz
 
 >**GeeekPi 10 Zoll 2U Rack-Halterung für Raspberry Pi 5**, mit 4PCS PCIe auf M.2 NVMe SSD Adaptern, hält bis zu 4 Raspberry Pi 5 Boards, kompatibel mit DeskPi RackMate T1/T0/T2/10 Zoll Server Rack
-
 > (Kann auch mit RPI4B genutzt werden um ggf Strom durch USB-C zu ziehen, nur die SSD Unterstützung (Breitbandkabel) kann dann nicht angeschlossen werden.)
 
 >**DIGITUS 4-Fach Steckdosenleiste** - 1HE - 10-Zoll (254 mm) - Rack-Montage in Netzwerk-Schrank - DN-95418 - Silber/Schwarz | 4x CEE 7/3 – 16A 4000W – 2 m Zuleitung – PDU für 10-Zoll (254 mm) Netzwerkschränke
@@ -34,7 +33,6 @@ Anleitung zur Einrichtung befindet sich in README_more.md.
 >**UGREEN Nexode Desktop Ladegerät (200W, 8-Port, GaN)**
 
 >**UGREEN USB C Kabel 100W Ladekabel USB-C 2 Stück PD 3.0 Schnellladekabel PPS USB C auf USB C** Kabel für iPhone 17/Air/16/15 Serie, MacBook Pro/Air, iPad Pro, Galaxy S24, Pixel 9, Steam Deck usw **(0.5M)**
-
 > (Für Raspberry PI4B Strom über USBC Ugreen Nexode Desktop Ladegerät)
 
 >**Raspberry Pi 5** (16 GB) oder Raspberry PI 4B (Raspberry PI 5 kann nicht mit dem Ugreen Netzteil betrieben werden, sondern benötigt separaten Strom, ich empfehle 2x RPI 5 2x RPI 4B !)

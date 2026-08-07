@@ -50,6 +50,10 @@ Eine Dokumentation zur Verkabelung für den RPI4b und RPI5 werden bald hier hinz
 
 ## Promotion / GUI
 
+https://youtube.com/shorts/G2Y0PIfUGNg?feature=share
+
+https://youtube.com/shorts/qUi6hELFmS4?feature=share
+
 <img width="1064" height="1198" alt="lueftergravity1" src="https://github.com/user-attachments/assets/54f403a9-90b1-498c-a1a2-2709b855e0b2" />
 
 

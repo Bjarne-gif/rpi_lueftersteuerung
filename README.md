@@ -56,6 +56,7 @@ https://youtube.com/shorts/qUi6hELFmS4?feature=share
 
 <img width="1064" height="1198" alt="lueftergravity1" src="https://github.com/user-attachments/assets/54f403a9-90b1-498c-a1a2-2709b855e0b2" />
 
+<img width="597" height="808" alt="image" src="https://github.com/user-attachments/assets/3140f382-21eb-4f7c-a810-f2cd1d3b94fe" />
 
 
 

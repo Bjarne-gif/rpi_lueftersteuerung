@@ -11,7 +11,7 @@
   <a href="https://youtube.com/shorts/qUi6hELFmS4?feature=share">
     <img src="https://img.shields.io/badge/YouTube-▶%20Video%20Ansehen-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch on YouTube">
   </a>
-</div>
+
 <div align="left">
   <a href="https://youtube.com/shorts/G2Y0PIfUGNg?feature=share">
     <img src="https://img.youtube.com/vi/DEINE_VIDEO_ID/maxresdefault.jpg" width="800" alt="">
@@ -21,7 +21,7 @@
     <img src="https://img.shields.io/badge/YouTube-▶%20Video%20Ansehen-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch on YouTube">
   </a>
 </div>
-
+</div>
 ### Beschreibung
 GPIO Steuerung für Raspberry PI Lüfter (4 Stk) im 10 zoll Rack.
 

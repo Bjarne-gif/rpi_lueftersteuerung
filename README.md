@@ -3,23 +3,21 @@
 ## Promotion / GUI
 
 <img width="1064" height="1198" alt="lueftergravity1" src="https://github.com/user-attachments/assets/54f403a9-90b1-498c-a1a2-2709b855e0b2" />
-
-<div align="center">
-  <a href="https://youtube.com/shorts/G2Y0PIfUGNg?feature=share">
-    <img src="https://img.youtube.com/vi/DEINE_VIDEO_ID/maxresdefault.jpg" width="800" alt="Video Titel">
+<div align="left">
+  <a href="https://youtube.com/shorts/qUi6hELFmS4?feature=share">
+    <img src="https://img.youtube.com/vi/DEINE_VIDEO_ID/maxresdefault.jpg" width="800" alt="Homelab Rack">
   </a>
   <br><br>
-  <a href="https://youtube.com/shorts/G2Y0PIfUGNg?feature=share">
+  <a href="https://youtube.com/shorts/qUi6hELFmS4?feature=share">
     <img src="https://img.shields.io/badge/YouTube-▶%20Video%20Ansehen-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch on YouTube">
   </a>
 </div>
-
-<div align="center">
-  <a href="https://youtube.com/shorts/qUi6hELFmS4?feature=share">
-    <img src="https://img.youtube.com/vi/DEINE_VIDEO_ID/maxresdefault.jpg" width="800" alt="Video Titel">
+<div align="left">
+  <a href="https://youtube.com/shorts/G2Y0PIfUGNg?feature=share">
+    <img src="https://img.youtube.com/vi/DEINE_VIDEO_ID/maxresdefault.jpg" width="800" alt="RGB Homelab Rack-Upgrade">
   </a>
   <br><br>
-  <a href="https://youtube.com/shorts/qUi6hELFmS4?feature=share">
+  <a href="https://youtube.com/shorts/G2Y0PIfUGNg?feature=share">
     <img src="https://img.shields.io/badge/YouTube-▶%20Video%20Ansehen-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch on YouTube">
   </a>
 </div>

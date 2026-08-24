@@ -1,6 +1,6 @@
 # Raspberry Pi Lüftersteuerung 
 
-## Promotion / GUI
+### Promotion / GUI
 
 <img width="1064" height="1198" alt="lueftergravity1" src="https://github.com/user-attachments/assets/54f403a9-90b1-498c-a1a2-2709b855e0b2" />
 <div align="left">

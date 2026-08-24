@@ -1,8 +1,15 @@
-
-
 # Raspberry Pi Lüftersteuerung 
 
-## Beschreibung
+## Promotion / GUI
+
+https://youtube.com/shorts/G2Y0PIfUGNg?feature=share
+
+https://youtube.com/shorts/qUi6hELFmS4?feature=share
+
+<img width="1064" height="1198" alt="lueftergravity1" src="https://github.com/user-attachments/assets/54f403a9-90b1-498c-a1a2-2709b855e0b2" />
+
+
+### Beschreibung
 GPIO Steuerung für Raspberry PI Lüfter (4 Stk) im 10 zoll Rack.
 
 Steuerung erfolgt über GUI im Browser gehostet auf dem RPI. (Port 5000)
@@ -11,7 +18,7 @@ Docker Unterstützung wird nachträglich umgesetzt.
 
 Anleitung zur Einrichtung befindet sich in README_more.md.
 
-## Hardware
+### Hardware
 
 >**Wandverteiler RBA - 10" Gehäuse** für kleine Hausanschlussnetze (SOHO), IP20, Tragkraft 20 kg.
 
@@ -42,19 +49,11 @@ Anleitung zur Einrichtung befindet sich in README_more.md.
 >**WAGO Verbindungsklemmen 221-413** – 3 Leiter, bis 4 mm², COMPACT Kabelverbinder mit Hebel für alle Leiterarten weltweit, transparente Kabelverbinder mit Prüföffnung, werkzeuglose Installation
 
 
-## WICHTIGE HINWEISE
+### WICHTIGE HINWEISE
 
 Falsche Verkabelung der Lüfter kann zu Schaden an der Hardware führen, bitte beachtet das! 
 
 Eine Dokumentation zur Verkabelung für den RPI4b und RPI5 werden bald hier hinzugefügt.
-
-## Promotion / GUI
-
-https://youtube.com/shorts/G2Y0PIfUGNg?feature=share
-
-https://youtube.com/shorts/qUi6hELFmS4?feature=share
-
-<img width="1064" height="1198" alt="lueftergravity1" src="https://github.com/user-attachments/assets/54f403a9-90b1-498c-a1a2-2709b855e0b2" />
 
 
 
